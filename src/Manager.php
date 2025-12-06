@@ -60,13 +60,10 @@ class Manager {
     public function handle_new_registration($entry_id, $form_id) {
         if ((int)$form_id !== (int)$this->s('form_id')) return;
         if (!$this->is_active()) return;
-    
-        // Direct Formidable Pro API call
-        if (class_exists('FrmEntryMeta')) {
-            $daftar = \call_user_func(['FrmEntryMeta', 'get_entry_meta'], $entry_id, (int)$this->s('daftar_field_id'));
-            if ($daftar === 'Ya') {
-                $this->record_activation($entry_id);
-            }
+        // Use helper to get entry meta instead of FrmEntryMeta
+        $daftar = function_exists('ff_get_entry_meta') ? ff_get_entry_meta($entry_id, (int)$this->s('daftar_field_id')) : null;
+        if ($daftar === 'Ya') {
+            $this->record_activation($entry_id);
         }
     }
 
@@ -74,14 +71,23 @@ class Manager {
         // return true if newly recorded
         $inserted = DB::insert_entry($entry_id);
         if (!$inserted) return false;
-
         // write promo code into entry meta if Formidable available (best-effort)
         $count = $this->get_count();
         $code = $this->get_current_code($count);
-        if ($code && class_exists('FrmEntryMeta')) {
-            \call_user_func(['FrmEntryMeta', 'update_entry_meta'], $entry_id, (int)$this->s('promo_field_id'), $code);
+        $promo_field_id = (int)$this->s('promo_field_id');
+        // Use direct DB update for promo code
+        global $wpdb;
+        if ($code) {
+            $wpdb->replace(
+                $wpdb->prefix . 'frm_item_metas',
+                [
+                    'item_id' => $entry_id,
+                    'field_id' => $promo_field_id,
+                    'meta_value' => $code
+                ],
+                ['%d', '%d', '%s']
+            );
         }
-
         // if milestone, send basic email
         $tier1 = (int)$this->s('tier1_max');
         $max = (int)$this->s('max');

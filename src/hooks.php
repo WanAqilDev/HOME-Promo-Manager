@@ -5,6 +5,24 @@ if (!defined('ABSPATH')) exit;
 
 // Basic Formidable hooks wiring
 
+require_once __DIR__ . '/utils.php';
+
+add_action('frm_after_create_entry', function($entry_id, $form_id) {
+    $mgr = Manager::get_instance();
+    if ((int)$form_id !== (int)$mgr->s('form_id')) return;
+    if (!$mgr->is_active()) return;
+    $daftar_field = (int)$mgr->s('daftar_field_id');
+    
+    // Use helper to get entry meta instead of non-existent method
+    $daftar_val = ff_get_entry_meta($entry_id, $daftar_field);
+    if ($daftar_val === 'Ya') {
+        $mgr->record_activation($entry_id);
+    }
+}, 10, 2);
+
+// Example: Get status for reactivation logic
+$new_status = ff_get_entry_meta($entry_id, (int)$mgr->s('status_field_id'));
+
 add_filter('frm_pre_create_entry', function($values) {
     $mgr = Manager::get_instance();
     $form_id = !empty($values['form_id']) ? (int)$values['form_id'] : 0;
@@ -21,8 +39,8 @@ add_action('frm_after_create_entry', function($entry_id, $form_id) {
     if (!$mgr->is_active()) return;
     $daftar_field = (int)$mgr->s('daftar_field_id');
     
-    // Use Pro API directly
-    $daftar_val = \FrmEntryMeta::get_entry_meta($entry_id, $daftar_field);
+    // Use helper to get entry meta instead of non-existent method
+    $daftar_val = ff_get_entry_meta($entry_id, $daftar_field);
     if ($daftar_val === 'Ya') {
         $mgr->record_activation($entry_id);
     }
@@ -51,7 +69,7 @@ add_action('frm_after_update_entry', function($entry_id, $form_id) {
     $old_status = $prev[$status_field] ?? null;
     $old_pasif = $prev[$pasif_field] ?? null;
     // new status:
-    $new_status = class_exists('FrmEntryMeta') ? \call_user_func(['FrmEntryMeta', 'get_entry_meta'], $entry_id, (int)$mgr->s('status_field_id')) : null;
+    $new_status = ff_get_entry_meta($entry_id, (int)$mgr->s('status_field_id'));
     if ($old_status === '2' && $new_status === '1' && !empty($old_pasif)) {
         try {
             $dt = \DateTime::createFromFormat('Y-m-d H:i:s', $old_pasif, new \DateTimeZone('Asia/Kuala_Lumpur'));
