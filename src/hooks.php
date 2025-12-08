@@ -15,8 +15,8 @@ add_action('frm_after_create_entry', function($entry_id, $form_id) {
     $daftar_field = (int)$mgr->s('daftar_field_id');
     
     // Use Formidable Pro's recommended method if available
-    if (class_exists('FrmProEntriesController') && method_exists('FrmProEntriesController', 'get_field_value_shortcode')) {
-        $daftar_val = FrmProEntriesController::get_field_value_shortcode(['field_id' => $daftar_field, 'entry' => $entry_id]);
+    if (class_exists('\FrmProEntriesController') && method_exists('\FrmProEntriesController', 'get_field_value_shortcode')) {
+        $daftar_val = \FrmProEntriesController::get_field_value_shortcode(['field_id' => $daftar_field, 'entry' => $entry_id]);
     } else {
         $daftar_val = ff_get_entry_meta($entry_id, $daftar_field);
     }
@@ -51,9 +51,9 @@ add_filter('frm_setup_edit_fields_vars', function($values, $field, $entry_id) {
     $pasif_field = (int)$mgr->s('pasif_date_field_id');
     
     // Use Formidable Pro's recommended method if available, fallback to direct query
-    if (class_exists('FrmProEntriesController') && method_exists('FrmProEntriesController', 'get_field_value_shortcode')) {
-        $current_status = FrmProEntriesController::get_field_value_shortcode(['field_id' => $status_field, 'entry' => $entry_id]);
-        $pasif_date = FrmProEntriesController::get_field_value_shortcode(['field_id' => $pasif_field, 'entry' => $entry_id]);
+    if (class_exists('\FrmProEntriesController') && method_exists('\FrmProEntriesController', 'get_field_value_shortcode')) {
+        $current_status = \FrmProEntriesController::get_field_value_shortcode(['field_id' => $status_field, 'entry' => $entry_id]);
+        $pasif_date = \FrmProEntriesController::get_field_value_shortcode(['field_id' => $pasif_field, 'entry' => $entry_id]);
     } else {
         $current_status = ff_get_entry_meta($entry_id, $status_field);
         $pasif_date = ff_get_entry_meta($entry_id, $pasif_field);
@@ -115,8 +115,8 @@ add_action('frm_after_update_entry', function($entry_id, $form_id) {
     $status_field = (int)$mgr->s('status_field_id');
     
     // Use Formidable Pro's recommended method if available
-    if (class_exists('FrmProEntriesController') && method_exists('FrmProEntriesController', 'get_field_value_shortcode')) {
-        $new_status = FrmProEntriesController::get_field_value_shortcode(['field_id' => $status_field, 'entry' => $entry_id]);
+    if (class_exists('\FrmProEntriesController') && method_exists('\FrmProEntriesController', 'get_field_value_shortcode')) {
+        $new_status = \FrmProEntriesController::get_field_value_shortcode(['field_id' => $status_field, 'entry' => $entry_id]);
     } else {
         $new_status = ff_get_entry_meta($entry_id, $status_field);
     }
@@ -156,9 +156,9 @@ add_action('frm_pre_update_entry', function($entry_id, $form_id) {
     $pasif_field = (int)$mgr->s('pasif_date_field_id');
     
     // Use Formidable Pro's method if available
-    if (class_exists('FrmProEntriesController') && method_exists('FrmProEntriesController', 'get_field_value_shortcode')) {
-        $old_status = FrmProEntriesController::get_field_value_shortcode(['field_id' => $status_field, 'entry' => $entry_id]);
-        $old_pasif = FrmProEntriesController::get_field_value_shortcode(['field_id' => $pasif_field, 'entry' => $entry_id]);
+    if (class_exists('\FrmProEntriesController') && method_exists('\FrmProEntriesController', 'get_field_value_shortcode')) {
+        $old_status = \FrmProEntriesController::get_field_value_shortcode(['field_id' => $status_field, 'entry' => $entry_id]);
+        $old_pasif = \FrmProEntriesController::get_field_value_shortcode(['field_id' => $pasif_field, 'entry' => $entry_id]);
     } else {
         $old_status = ff_get_entry_meta($entry_id, $status_field);
         $old_pasif = ff_get_entry_meta($entry_id, $pasif_field);
@@ -208,8 +208,8 @@ add_action('frm_after_update_entry', function($entry_id, $form_id) {
     
     // Get new status
     $status_field = (int)$mgr->s('status_field_id');
-    if (class_exists('FrmProEntriesController') && method_exists('FrmProEntriesController', 'get_field_value_shortcode')) {
-        $new_status = FrmProEntriesController::get_field_value_shortcode(['field_id' => $status_field, 'entry' => $entry_id]);
+    if (class_exists('\FrmProEntriesController') && method_exists('\FrmProEntriesController', 'get_field_value_shortcode')) {
+        $new_status = \FrmProEntriesController::get_field_value_shortcode(['field_id' => $status_field, 'entry' => $entry_id]);
     } else {
         $new_status = ff_get_entry_meta($entry_id, $status_field);
     }
