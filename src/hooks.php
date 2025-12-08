@@ -55,7 +55,6 @@ add_action('frm_pre_update_entry', function($entry_id, $form_id) {
     // Use 5-minute expiry instead of 60 seconds
     set_transient('hpm_prev_meta_' . $entry_id, $prev_data, 300);
 }, 5, 2);
-}, 5, 2);
 
 // After update: detect reactivation
 add_action('frm_after_update_entry', function($entry_id, $form_id) {
