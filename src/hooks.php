@@ -51,11 +51,22 @@ add_action('frm_before_update_entry', function($entry_id, $form_id) {
 // After update: detect reactivation
 add_action('frm_after_update_entry', function($entry_id, $form_id) {
     $mgr = Manager::get_instance();
-    if ((int)$form_id !== (int)$mgr->s('form_id')) return;
-    if (!$mgr->is_active()) return;
+    
+    error_log('[HPM] frm_after_update_entry triggered for entry: ' . $entry_id . ', form: ' . $form_id);
+    
+    if ((int)$form_id !== (int)$mgr->s('form_id')) {
+        error_log('[HPM] Form ID mismatch. Expected: ' . $mgr->s('form_id') . ', Got: ' . $form_id);
+        return;
+    }
+    
+    if (!$mgr->is_active()) {
+        error_log('[HPM] Promo not active. Skipping reactivation check.');
+        return;
+    }
     
     // Check if already reactivated (prevent duplicates)
     if (DB::has_reactivation($entry_id)) {
+        error_log('[HPM] Entry ' . $entry_id . ' already has reactivation. Skipping.');
         delete_transient('hpm_prev_meta_' . $entry_id);
         return;
     }
@@ -66,11 +77,16 @@ add_action('frm_after_update_entry', function($entry_id, $form_id) {
     $old_status = $prev['status'] ?? null;
     $old_pasif = $prev['pasif_date'] ?? null;
     
+    error_log('[HPM] Previous meta - Status: ' . var_export($old_status, true) . ', Pasif date: ' . var_export($old_pasif, true));
+    
     // Get new status
     $new_status = ff_get_entry_meta($entry_id, (int)$mgr->s('status_field_id'));
     
+    error_log('[HPM] New status: ' . var_export($new_status, true));
+    
     // Check reactivation conditions: status changed from 2 to 1, has pasif date, and > 90 days
     if ($old_status === '2' && $new_status === '1' && !empty($old_pasif)) {
+        error_log('[HPM] Reactivation conditions met for entry ' . $entry_id);
         try {
             $dt = \DateTime::createFromFormat('Y-m-d H:i:s', $old_pasif, new \DateTimeZone('Asia/Kuala_Lumpur'));
             if (!$dt) $dt = new \DateTime($old_pasif, new \DateTimeZone('Asia/Kuala_Lumpur'));
@@ -81,9 +97,16 @@ add_action('frm_after_update_entry', function($entry_id, $form_id) {
         
         $days_inactive = $pasif_ts ? ((time() - $pasif_ts) / 86400) : 0;
         
+        error_log('[HPM] Days inactive: ' . $days_inactive);
+        
         if ($days_inactive > 90) {
+            error_log('[HPM] Triggering reactivation for entry ' . $entry_id);
             // Process reactivation
             $mgr->record_reactivation($entry_id, $old_status, $new_status, $old_pasif);
+        } else {
+            error_log('[HPM] Not enough days inactive (' . $days_inactive . ' <= 90). Skipping.');
         }
+    } else {
+        error_log('[HPM] Reactivation conditions NOT met. Old: ' . var_export($old_status, true) . ', New: ' . var_export($new_status, true) . ', Pasif: ' . var_export($old_pasif, true));
     }
 }, 10, 2);

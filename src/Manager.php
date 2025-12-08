@@ -102,28 +102,41 @@ class Manager {
      * @return bool
      */
     public function record_reactivation($entry_id, $old_status, $new_status, $pasif_date) {
+        error_log('[HPM] Manager::record_reactivation called for entry ' . $entry_id);
+        
         // Get promo code first
         $count = $this->get_count();
         $code = $this->get_current_code($count);
         
+        error_log('[HPM] Count: ' . $count . ', Promo code: ' . $code);
+        
         // Log to reactivation table
         $logged = DB::log_reactivation($entry_id, $old_status, $new_status, $pasif_date, $code);
         
-        if (!$logged) return false;
+        if (!$logged) {
+            error_log('[HPM] Failed to log reactivation to table');
+            return false;
+        }
+        
+        error_log('[HPM] Reactivation logged successfully');
         
         // Update entry meta with promo code
         $promo_field_id = (int)$this->s('promo_field_id');
         if ($code) {
+            error_log('[HPM] Updating promo field ' . $promo_field_id . ' with code: ' . $code);
             ff_update_entry_meta($entry_id, $promo_field_id, $code);
         }
         
         // Mark entry as reactivated with a flag
+        error_log('[HPM] Setting reactivation flags');
         ff_update_entry_meta($entry_id, 9999, 'yes'); // Use a custom field ID for reactivation flag
         ff_update_entry_meta($entry_id, 9998, date('Y-m-d H:i:s')); // Use a custom field ID for reactivation date
         
         // Count this as an activation
+        error_log('[HPM] Counting reactivation as activation');
         DB::insert_entry($entry_id);
         
+        error_log('[HPM] Reactivation complete for entry ' . $entry_id);
         return true;
     }
 
