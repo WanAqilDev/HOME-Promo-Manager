@@ -50,7 +50,7 @@ add_filter('frm_setup_edit_fields_vars', function($values, $field, $entry_id) {
     $current_status = ff_get_entry_meta($entry_id, $status_field);
     $pasif_date = ff_get_entry_meta($entry_id, $pasif_field);
     
-    error_log('[HPM] Retrieved values - Status: ' . var_export($current_status, true) . ', Pasif date: ' . var_export($pasif_date, true));
+    error_log('[HPM] Retrieved values - Status: ' . var_export($current_status, true) . ' (type: ' . gettype($current_status) . '), Pasif date: ' . var_export($pasif_date, true));
     
     error_log('[HPM] Current status: ' . var_export($current_status, true) . ', Pasif date: ' . var_export($pasif_date, true));
     
