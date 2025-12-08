@@ -30,23 +30,32 @@ add_filter('frm_pre_create_entry', function($values) {
     return $values;
 });
 
-// Capture previous meta (hook for reactivation flow)
-add_action('frm_before_update_entry', function($entry_id, $form_id) {
+// Capture previous meta BEFORE any database update (hook for reactivation flow)
+// Priority 5 to run early before Formidable updates the meta
+add_action('frm_pre_update_entry', function($entry_id, $form_id) {
     $mgr = Manager::get_instance();
     if ((int)$form_id !== (int)$mgr->s('form_id')) return;
     
-    // Store previous status and pasif date in longer-lived transient
+    error_log('[HPM] frm_pre_update_entry - Capturing OLD values for entry ' . $entry_id);
+    
+    // Get current (old) values directly from database BEFORE update
     $status_field = (int)$mgr->s('status_field_id');
     $pasif_field = (int)$mgr->s('pasif_date_field_id');
     
+    $old_status = ff_get_entry_meta($entry_id, $status_field);
+    $old_pasif = ff_get_entry_meta($entry_id, $pasif_field);
+    
+    error_log('[HPM] Captured OLD status: ' . var_export($old_status, true) . ', OLD pasif: ' . var_export($old_pasif, true));
+    
     $prev_data = [
-        'status' => ff_get_entry_meta($entry_id, $status_field),
-        'pasif_date' => ff_get_entry_meta($entry_id, $pasif_field),
+        'status' => $old_status,
+        'pasif_date' => $old_pasif,
     ];
     
     // Use 5-minute expiry instead of 60 seconds
     set_transient('hpm_prev_meta_' . $entry_id, $prev_data, 300);
-}, 10, 2);
+}, 5, 2);
+}, 5, 2);
 
 // After update: detect reactivation
 add_action('frm_after_update_entry', function($entry_id, $form_id) {
