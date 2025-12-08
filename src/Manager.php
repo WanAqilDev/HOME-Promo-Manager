@@ -75,18 +75,9 @@ class Manager {
         $count = $this->get_count();
         $code = $this->get_current_code($count);
         $promo_field_id = (int)$this->s('promo_field_id');
-        // Use direct DB update for promo code
-        global $wpdb;
+        // Use helper function for promo code update
         if ($code) {
-            $wpdb->replace(
-                $wpdb->prefix . 'frm_item_metas',
-                [
-                    'item_id' => $entry_id,
-                    'field_id' => $promo_field_id,
-                    'meta_value' => $code
-                ],
-                ['%d', '%d', '%s']
-            );
+            ff_update_entry_meta($entry_id, $promo_field_id, $code);
         }
         // if milestone, send basic email
         $tier1 = (int)$this->s('tier1_max');
@@ -98,6 +89,41 @@ class Manager {
                 $GLOBALS['wp_mail']($this->s('admin_email'), $subject, $msg);
             }
         }
+        return true;
+    }
+
+    /**
+     * Record a reactivation for returning clients
+     *
+     * @param int $entry_id
+     * @param string $old_status
+     * @param string $new_status
+     * @param string $pasif_date
+     * @return bool
+     */
+    public function record_reactivation($entry_id, $old_status, $new_status, $pasif_date) {
+        // Get promo code first
+        $count = $this->get_count();
+        $code = $this->get_current_code($count);
+        
+        // Log to reactivation table
+        $logged = DB::log_reactivation($entry_id, $old_status, $new_status, $pasif_date, $code);
+        
+        if (!$logged) return false;
+        
+        // Update entry meta with promo code
+        $promo_field_id = (int)$this->s('promo_field_id');
+        if ($code) {
+            ff_update_entry_meta($entry_id, $promo_field_id, $code);
+        }
+        
+        // Mark entry as reactivated with a flag
+        ff_update_entry_meta($entry_id, 9999, 'yes'); // Use a custom field ID for reactivation flag
+        ff_update_entry_meta($entry_id, 9998, date('Y-m-d H:i:s')); // Use a custom field ID for reactivation date
+        
+        // Count this as an activation
+        DB::insert_entry($entry_id);
+        
         return true;
     }
 

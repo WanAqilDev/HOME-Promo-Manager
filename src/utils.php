@@ -20,3 +20,27 @@ if (!function_exists('ff_get_entry_meta')) {
         );
     }
 }
+
+if (!function_exists('ff_update_entry_meta')) {
+    /**
+     * Update or insert entry meta value for a given entry and field in Formidable Forms.
+     *
+     * @param int $entry_id
+     * @param int $field_id
+     * @param mixed $value
+     * @return bool
+     */
+    function ff_update_entry_meta($entry_id, $field_id, $value) {
+        global $wpdb;
+        $res = $wpdb->replace(
+            $wpdb->prefix . 'frm_item_metas',
+            [
+                'item_id' => (int)$entry_id,
+                'field_id' => (int)$field_id,
+                'meta_value' => $value
+            ],
+            ['%d', '%d', '%s']
+        );
+        return $res !== false;
+    }
+}

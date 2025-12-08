@@ -34,11 +34,18 @@ add_filter('frm_pre_create_entry', function($values) {
 add_action('frm_before_update_entry', function($entry_id, $form_id) {
     $mgr = Manager::get_instance();
     if ((int)$form_id !== (int)$mgr->s('form_id')) return;
-    global $wpdb;
-    $rows = $wpdb->get_results($wpdb->prepare("SELECT field_id, meta_value FROM {$wpdb->prefix}frm_item_metas WHERE item_id=%d", $entry_id));
-    $map = [];
-    foreach ($rows as $r) $map[(string)$r->field_id] = $r->meta_value;
-    set_transient('hpm_prev_meta_' . $entry_id, $map, 60);
+    
+    // Store previous status and pasif date in longer-lived transient
+    $status_field = (int)$mgr->s('status_field_id');
+    $pasif_field = (int)$mgr->s('pasif_date_field_id');
+    
+    $prev_data = [
+        'status' => ff_get_entry_meta($entry_id, $status_field),
+        'pasif_date' => ff_get_entry_meta($entry_id, $pasif_field),
+    ];
+    
+    // Use 5-minute expiry instead of 60 seconds
+    set_transient('hpm_prev_meta_' . $entry_id, $prev_data, 300);
 }, 10, 2);
 
 // After update: detect reactivation
@@ -46,14 +53,23 @@ add_action('frm_after_update_entry', function($entry_id, $form_id) {
     $mgr = Manager::get_instance();
     if ((int)$form_id !== (int)$mgr->s('form_id')) return;
     if (!$mgr->is_active()) return;
+    
+    // Check if already reactivated (prevent duplicates)
+    if (DB::has_reactivation($entry_id)) {
+        delete_transient('hpm_prev_meta_' . $entry_id);
+        return;
+    }
+    
     $prev = get_transient('hpm_prev_meta_' . $entry_id) ?: [];
     delete_transient('hpm_prev_meta_' . $entry_id);
-    $status_field = (string)$mgr->s('status_field_id');
-    $pasif_field = (string)$mgr->s('pasif_date_field_id');
-    $old_status = $prev[$status_field] ?? null;
-    $old_pasif = $prev[$pasif_field] ?? null;
-    // new status:
+    
+    $old_status = $prev['status'] ?? null;
+    $old_pasif = $prev['pasif_date'] ?? null;
+    
+    // Get new status
     $new_status = ff_get_entry_meta($entry_id, (int)$mgr->s('status_field_id'));
+    
+    // Check reactivation conditions: status changed from 2 to 1, has pasif date, and > 90 days
     if ($old_status === '2' && $new_status === '1' && !empty($old_pasif)) {
         try {
             $dt = \DateTime::createFromFormat('Y-m-d H:i:s', $old_pasif, new \DateTimeZone('Asia/Kuala_Lumpur'));
@@ -62,8 +78,12 @@ add_action('frm_after_update_entry', function($entry_id, $form_id) {
         } catch (\Exception $e) {
             $pasif_ts = 0;
         }
-        if ($pasif_ts && ((time() - $pasif_ts)/86400) > 90) {
-            $mgr->record_activation($entry_id);
+        
+        $days_inactive = $pasif_ts ? ((time() - $pasif_ts) / 86400) : 0;
+        
+        if ($days_inactive > 90) {
+            // Process reactivation
+            $mgr->record_reactivation($entry_id, $old_status, $new_status, $old_pasif);
         }
     }
 }, 10, 2);
