@@ -73,13 +73,23 @@ add_action('frm_after_update_entry', function ($entry_id, $form_id) {
 
 
 // REACTIVATION: Capture previous meta BEFORE any database update
+// REACTIVATION: Capture previous meta BEFORE any database update
 // Priority 5 to run early before Formidable updates the meta
-add_action('frm_pre_update_entry', function ($entry_id, $form_id) {
+add_action('frm_pre_update_entry', function ($entry_id, $values) {
     $mgr = Manager::get_instance();
-    if ((int) $form_id !== (int) $mgr->s('form_id'))
-        return;
 
-    error_log('[HPM] frm_pre_update_entry - Capturing OLD values for entry ' . $entry_id);
+    // Check form_id from the values array
+    $form_id = isset($values['form_id']) ? (int) $values['form_id'] : 0;
+
+    // Debug logging
+    error_log(sprintf('[HPM-DEBUG] Pre-update triggered. Entry: %d, Form: %d', $entry_id, $form_id));
+
+    if ($form_id !== (int) $mgr->s('form_id')) {
+        // error_log('[HPM-DEBUG] Form ID mismatch in pre-update. Ignoring.');
+        return;
+    }
+
+    error_log('[HPM-DEBUG] Capturing OLD values for entry ' . $entry_id);
 
     // Get current (old) values directly from database BEFORE update
     $status_field = (int) $mgr->s('status_field_id');
@@ -88,14 +98,14 @@ add_action('frm_pre_update_entry', function ($entry_id, $form_id) {
     $old_status = ff_get_field_value_robust($entry_id, $status_field);
     $old_pasif = ff_get_field_value_robust($entry_id, $pasif_field);
 
-    error_log('[HPM] Captured OLD status: ' . var_export($old_status, true) . ', OLD pasif: ' . var_export($old_pasif, true));
+    error_log(sprintf('[HPM-DEBUG] Captured OLD: Status=%s, PasifDate=%s', var_export($old_status, true), var_export($old_pasif, true)));
 
     $prev_data = [
         'status' => $old_status,
         'pasif_date' => $old_pasif,
     ];
 
-    // Use 5-minute expiry instead of 60 seconds
+    // Use 5-minute expiry
     set_transient('hpm_prev_meta_' . $entry_id, $prev_data, 300);
 }, 5, 2);
 
@@ -103,7 +113,7 @@ add_action('frm_pre_update_entry', function ($entry_id, $form_id) {
 add_action('frm_after_update_entry', function ($entry_id, $form_id) {
     $mgr = Manager::get_instance();
 
-    error_log('[HPM] frm_after_update_entry triggered for entry: ' . $entry_id . ', form: ' . $form_id);
+    error_log(sprintf('[HPM-DEBUG] Post-update triggered. Entry: %d, Form: %d', $entry_id, $form_id));
 
     // Form 13 is used for BOTH new registrations AND edits/reactivations
     if ((int) $form_id !== (int) $mgr->s('form_id')) {
@@ -111,13 +121,13 @@ add_action('frm_after_update_entry', function ($entry_id, $form_id) {
     }
 
     if (!$mgr->is_active()) {
-        error_log('[HPM] Promo not active. Skipping reactivation check.');
+        error_log('[HPM-DEBUG] Promo not active. Skipping.');
         return;
     }
 
     // Check if already reactivated (prevent duplicates)
     if (DB::has_reactivation($entry_id)) {
-        error_log('[HPM] Entry ' . $entry_id . ' already has reactivation. Skipping.');
+        error_log('[HPM-DEBUG] Already reactivated. Skipping.');
         delete_transient('hpm_prev_meta_' . $entry_id);
         return;
     }
@@ -125,31 +135,25 @@ add_action('frm_after_update_entry', function ($entry_id, $form_id) {
     $prev = get_transient('hpm_prev_meta_' . $entry_id) ?: [];
     delete_transient('hpm_prev_meta_' . $entry_id);
 
+    if (empty($prev)) {
+        error_log('[HPM-DEBUG] No previous meta found (transient missing/expired).');
+        return;
+    }
+
     $old_status = $prev['status'] ?? null;
     $old_pasif = $prev['pasif_date'] ?? null;
 
-    error_log('[HPM] Previous meta - Status: ' . var_export($old_status, true) . ', Pasif date: ' . var_export($old_pasif, true));
+    error_log(sprintf('[HPM-DEBUG] Retrieved OLD from transient: Status=%s, PasifDate=%s', var_export($old_status, true), var_export($old_pasif, true)));
 
     // Get new status
     $status_field = (int) $mgr->s('status_field_id');
-
-    error_log('[HPM] Checking entry ' . $entry_id . ' for status field ' . $status_field);
-
-    // Debug: Check what fields exist for this entry
-    global $wpdb;
-    $all_metas = $wpdb->get_results($wpdb->prepare(
-        "SELECT field_id, meta_value FROM {$wpdb->prefix}frm_item_metas WHERE item_id = %d",
-        $entry_id
-    ), ARRAY_A);
-    error_log('[HPM] All meta fields for entry ' . $entry_id . ': ' . print_r($all_metas, true));
-
     $new_status = ff_get_field_value_robust($entry_id, $status_field);
 
-    error_log('[HPM] New status: ' . var_export($new_status, true));
+    error_log(sprintf('[HPM-DEBUG] Retrieved NEW: Status=%s', var_export($new_status, true)));
 
     // Check reactivation conditions: status changed from 2 to 1, has pasif date, and > 90 days
     if ($old_status === '2' && $new_status === '1' && !empty($old_pasif)) {
-        error_log('[HPM] Reactivation conditions met for entry ' . $entry_id);
+        error_log('[HPM-DEBUG] Status change 2->1 detected. Checking date...');
         try {
             $dt = \DateTime::createFromFormat('Y-m-d H:i:s', $old_pasif, new \DateTimeZone('Asia/Kuala_Lumpur'));
             if (!$dt)
@@ -161,16 +165,16 @@ add_action('frm_after_update_entry', function ($entry_id, $form_id) {
 
         $days_inactive = $pasif_ts ? ((time() - $pasif_ts) / 86400) : 0;
 
-        error_log('[HPM] Days inactive: ' . $days_inactive);
+        error_log(sprintf('[HPM-DEBUG] Days inactive: %.2f', $days_inactive));
 
         if ($days_inactive > 90) {
-            error_log('[HPM] Triggering reactivation for entry ' . $entry_id);
+            error_log('[HPM-DEBUG] QUALIFIED! Triggering reactivation.');
             // Process reactivation
             $mgr->record_reactivation($entry_id, $old_status, $new_status, $old_pasif);
         } else {
-            error_log('[HPM] Not enough days inactive (' . $days_inactive . ' <= 90). Skipping.');
+            error_log('[HPM-DEBUG] Not qualified (<= 90 days).');
         }
     } else {
-        error_log('[HPM] Reactivation conditions NOT met. Old: ' . var_export($old_status, true) . ', New: ' . var_export($new_status, true) . ', Pasif: ' . var_export($old_pasif, true));
+        error_log('[HPM-DEBUG] Conditions not met.');
     }
 }, 10, 2);
