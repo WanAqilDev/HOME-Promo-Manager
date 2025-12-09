@@ -75,40 +75,19 @@ add_action('frm_after_update_entry', function ($entry_id, $form_id) {
 // REACTIVATION: Capture previous meta BEFORE any database update
 // REACTIVATION: Capture previous meta BEFORE any database update
 // Priority 5 to run early before Formidable updates the meta
-add_action('frm_pre_update_entry', function ($arg1, $arg2 = null, $arg3 = null) {
+add_action('frm_pre_update_entry', function ($values, $entry_id) {
     $mgr = Manager::get_instance();
 
-    error_log('[HPM-DEBUG] frm_pre_update_entry FIRED.');
-    error_log('[HPM-DEBUG] Arg1 type: ' . gettype($arg1) . ', value: ' . print_r($arg1, true));
-    error_log('[HPM-DEBUG] Arg2 type: ' . gettype($arg2) . ', value: ' . print_r($arg2, true));
-    error_log('[HPM-DEBUG] Arg3 type: ' . gettype($arg3) . ', value: ' . print_r($arg3, true));
+    // Formidable passes ($values, $id)
+    // $values is the array of submitted data
+    // $entry_id is the ID of the entry being updated
 
-    // Attempt to identify Entry ID and Form ID
-    $entry_id = 0;
-    $form_id = 0;
+    $form_id = isset($values['form_id']) ? (int) $values['form_id'] : 0;
+    $entry_id = (int) $entry_id;
 
-    // Hypothesis 1: ($entry_id, $form_id)
-    if (is_numeric($arg1) && is_numeric($arg2)) {
-        $entry_id = (int) $arg1;
-        $form_id = (int) $arg2;
-    }
-    // Hypothesis 2: ($entry_id, $values)
-    elseif (is_numeric($arg1) && is_array($arg2)) {
-        $entry_id = (int) $arg1;
-        $form_id = isset($arg2['form_id']) ? (int) $arg2['form_id'] : 0;
-    }
-
-    // Fallback: Look up Form ID if we have Entry ID
-    if ($entry_id > 0 && $form_id === 0) {
-        global $wpdb;
-        $form_id = (int) $wpdb->get_var($wpdb->prepare("SELECT form_id FROM {$wpdb->prefix}frm_items WHERE id = %d", $entry_id));
-        error_log('[HPM-DEBUG] Looked up Form ID from DB: ' . $form_id);
-    }
-
-    error_log(sprintf('[HPM-DEBUG] Resolved: Entry: %d, Form: %d', $entry_id, $form_id));
+    error_log(sprintf('[HPM-DEBUG] Pre-update triggered. Entry: %d, Form: %d', $entry_id, $form_id));
 
     if ($form_id !== (int) $mgr->s('form_id')) {
-        error_log('[HPM-DEBUG] Form ID mismatch. Expected: ' . $mgr->s('form_id') . ', Got: ' . $form_id);
         return;
     }
 
@@ -130,7 +109,7 @@ add_action('frm_pre_update_entry', function ($arg1, $arg2 = null, $arg3 = null) 
 
     // Use 5-minute expiry
     set_transient('hpm_prev_meta_' . $entry_id, $prev_data, 300);
-}, 5, 3);
+}, 5, 2);
 
 // After update: detect reactivation
 add_action('frm_after_update_entry', function ($entry_id, $form_id) {
