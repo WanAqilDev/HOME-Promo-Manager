@@ -146,8 +146,8 @@ add_action('frm_pre_update_entry', function($entry_id, $form_id) {
     $status_field = (int)$mgr->s('status_field_id');
     $pasif_field = (int)$mgr->s('pasif_date_field_id');
     
-    $old_status = ff_get_entry_meta($entry_id, $status_field);
-    $old_pasif = ff_get_entry_meta($entry_id, $pasif_field);
+    $old_status = ff_get_field_value_robust($entry_id, $status_field);
+    $old_pasif = ff_get_field_value_robust($entry_id, $pasif_field);
     
     error_log('[HPM] Captured OLD status: ' . var_export($old_status, true) . ', OLD pasif: ' . var_export($old_pasif, true));
     
@@ -166,6 +166,7 @@ add_action('frm_after_update_entry', function($entry_id, $form_id) {
     
     error_log('[HPM] frm_after_update_entry triggered for entry: ' . $entry_id . ', form: ' . $form_id);
     
+    // Form 13 is used for BOTH new registrations AND edits/reactivations
     if ((int)$form_id !== (int)$mgr->s('form_id')) {
         error_log('[HPM] Form ID mismatch. Expected: ' . $mgr->s('form_id') . ', Got: ' . $form_id);
         return;
@@ -193,7 +194,18 @@ add_action('frm_after_update_entry', function($entry_id, $form_id) {
     
     // Get new status
     $status_field = (int)$mgr->s('status_field_id');
-    $new_status = ff_get_entry_meta($entry_id, $status_field);
+    
+    error_log('[HPM] Checking entry ' . $entry_id . ' for status field ' . $status_field);
+    
+    // Debug: Check what fields exist for this entry
+    global $wpdb;
+    $all_metas = $wpdb->get_results($wpdb->prepare(
+        "SELECT field_id, meta_value FROM {$wpdb->prefix}frm_item_metas WHERE item_id = %d",
+        $entry_id
+    ), ARRAY_A);
+    error_log('[HPM] All meta fields for entry ' . $entry_id . ': ' . print_r($all_metas, true));
+    
+    $new_status = ff_get_field_value_robust($entry_id, $status_field);
     
     error_log('[HPM] New status: ' . var_export($new_status, true));
     
