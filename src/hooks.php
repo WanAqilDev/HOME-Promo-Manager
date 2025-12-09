@@ -47,8 +47,9 @@ add_filter('frm_setup_edit_fields_vars', function($values, $field, $entry_id) {
     
     error_log('[HPM] Querying fields - Status field: ' . $status_field . ', Pasif field: ' . $pasif_field);
     
-    $current_status = ff_get_entry_meta($entry_id, $status_field);
-    $pasif_date = ff_get_entry_meta($entry_id, $pasif_field);
+    // Use robust retrieval with fallbacks
+    $current_status = ff_get_field_value_robust($entry_id, $status_field);
+    $pasif_date = ff_get_field_value_robust($entry_id, $pasif_field);
     
     error_log('[HPM] Retrieved values - Status: ' . var_export($current_status, true) . ' (type: ' . gettype($current_status) . '), Pasif date: ' . var_export($pasif_date, true));
     
@@ -109,7 +110,7 @@ add_action('frm_after_update_entry', function($entry_id, $form_id) {
     
     error_log('[HPM] Querying status field: ' . $status_field . ' for entry: ' . $entry_id);
     
-    $new_status = ff_get_entry_meta($entry_id, $status_field);
+    $new_status = ff_get_field_value_robust($entry_id, $status_field);
     
     error_log('[HPM] New status after submission: ' . var_export($new_status, true));
     

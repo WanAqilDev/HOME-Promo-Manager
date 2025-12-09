@@ -7,6 +7,9 @@ add_action('rest_api_init', function() {
     register_rest_route('promo/v1', '/counter', [
         'methods' => 'GET',
         'callback' => function() {
+            // Ensure tables exist before querying
+            DB::maybe_create_tables();
+            
             $mgr = Manager::get_instance();
             if (!$mgr->is_active()) {
                 return rest_ensure_response(['active' => false]);
