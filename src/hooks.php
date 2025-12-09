@@ -31,6 +31,38 @@ add_filter('frm_pre_create_entry', function($values) {
     return $values;
 });
 
+// AUTO-SET PASIF DATE: When status changes to pasif (2), automatically set the pasif date to today
+add_action('frm_after_update_entry', function($entry_id, $form_id) {
+    $mgr = Manager::get_instance();
+    
+    // Only run for Form 13
+    if ((int)$form_id !== (int)$mgr->s('form_id')) return;
+    
+    $status_field = (int)$mgr->s('status_field_id');
+    $pasif_field = (int)$mgr->s('pasif_date_field_id');
+    
+    if (!$status_field || !$pasif_field) return;
+    
+    // Get current status
+    $current_status = ff_get_field_value_robust($entry_id, $status_field);
+    
+    error_log('[HPM Auto-Date] Entry ' . $entry_id . ' status: ' . var_export($current_status, true));
+    
+    // If status is pasif (2), ensure pasif date is set to today
+    if ($current_status === '2') {
+        $existing_pasif_date = ff_get_field_value_robust($entry_id, $pasif_field);
+        
+        // Only update if empty or doesn't exist yet
+        if (empty($existing_pasif_date)) {
+            $today = date('Y-m-d');
+            error_log('[HPM Auto-Date] Setting pasif date to ' . $today . ' for entry ' . $entry_id);
+            ff_update_entry_meta($entry_id, $pasif_field, $today);
+        } else {
+            error_log('[HPM Auto-Date] Pasif date already set to ' . $existing_pasif_date . ' - keeping existing date');
+        }
+    }
+}, 5, 2);
+
 // REACTIVATION: Check eligibility when edit form (form 41) is loaded
 add_filter('frm_setup_edit_fields_vars', function($values, $field, $entry_id) {
     $mgr = Manager::get_instance();

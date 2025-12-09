@@ -45,8 +45,8 @@ function sanitize_settings($input) {
     $out['promo_field_id'] = isset($input['promo_field_id']) ? absint($input['promo_field_id']) : absint($defaults['promo_field_id'] ?? 3170);
     $out['daftar_field_id'] = isset($input['daftar_field_id']) ? absint($input['daftar_field_id']) : absint($defaults['daftar_field_id'] ?? 196);
 
-    $out['status_field_id'] = isset($input['status_field_id']) ? absint($input['status_field_id']) : absint($defaults['status_field_id'] ?? 0);
-    $out['pasif_date_field_id'] = isset($input['pasif_date_field_id']) ? absint($input['pasif_date_field_id']) : absint($defaults['pasif_date_field_id'] ?? 0);
+    $out['status_field_id'] = isset($input['status_field_id']) ? absint($input['status_field_id']) : absint($defaults['status_field_id'] ?? 209);
+    $out['pasif_date_field_id'] = isset($input['pasif_date_field_id']) ? absint($input['pasif_date_field_id']) : absint($defaults['pasif_date_field_id'] ?? 1698);
 
     $out['max'] = isset($input['max']) ? absint($input['max']) : absint($defaults['max'] ?? 480);
     $out['tier1_max'] = isset($input['tier1_max']) ? absint($input['tier1_max']) : absint($defaults['tier1_max'] ?? 240);
@@ -129,11 +129,17 @@ function render_admin_page() {
                     </tr>
                     <tr>
                         <th scope="row"><label for="hpm_status_field">Status Field ID</label></th>
-                        <td><input name="home_promo_manager_settings[status_field_id]" type="number" id="hpm_status_field" value="<?php echo esc_attr($opts['status_field_id']); ?>" class="small-text" /></td>
+                        <td>
+                            <input name="home_promo_manager_settings[status_field_id]" type="number" id="hpm_status_field" value="<?php echo esc_attr($opts['status_field_id']); ?>" class="small-text" />
+                            <p class="description">Field ID for client status (aktif=1, pasif=2). Example: 199</p>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="hpm_pasif_field">Pasif Date Field ID</label></th>
-                        <td><input name="home_promo_manager_settings[pasif_date_field_id]" type="number" id="hpm_pasif_field" value="<?php echo esc_attr($opts['pasif_date_field_id']); ?>" class="small-text" /></td>
+                        <td>
+                            <input name="home_promo_manager_settings[pasif_date_field_id]" type="number" id="hpm_pasif_field" value="<?php echo esc_attr($opts['pasif_date_field_id']); ?>" class="small-text" />
+                            <p class="description">Field ID for the date when client became pasif. Example: 1698</p>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="hpm_max">Max Slots</label></th>
