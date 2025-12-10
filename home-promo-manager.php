@@ -24,7 +24,9 @@ define('HOME_PROMO_MANAGER_DIR', plugin_dir_path(__FILE__));
 define('HOME_PROMO_MANAGER_VERSION', '1.5.0');
 
 // Bootstrap
-require_once HOME_PROMO_MANAGER_DIR . 'src/bootstrap.php';
+require_once __DIR__ . '/src/db.php';
+require_once __DIR__ . '/src/templates.php';
+require_once __DIR__ . '/src/hooks.php';
 
 // GitHub Auto-Updater
 require_once HOME_PROMO_MANAGER_DIR . 'src/updater.php';
