@@ -91,7 +91,7 @@ add_action('frm_pre_update_entry', function ($values, $entry_id) {
     }
 
     if ($form_id !== (int) $mgr->s('form_id')) {
-        return;
+        return $values;
     }
 
     if ($mgr->s('debug_mode')) {
@@ -116,6 +116,8 @@ add_action('frm_pre_update_entry', function ($values, $entry_id) {
 
     // Use 5-minute expiry
     set_transient('hpm_prev_meta_' . $entry_id, $prev_data, 300);
+
+    return $values;
 }, 5, 2);
 
 // After update: detect reactivation
