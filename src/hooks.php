@@ -16,9 +16,10 @@ add_action('frm_after_create_entry', function ($entry_id, $form_id) {
     if (!$mgr->is_active())
         return;
     $daftar_field = (int) $mgr->s('daftar_field_id');
+    $trigger_val = $mgr->s('daftar_trigger_value') ?: 'Ya';
 
     $daftar_val = ff_get_entry_meta($entry_id, $daftar_field);
-    if ($daftar_val === 'Ya') {
+    if ($daftar_val === $trigger_val) {
         $mgr->record_activation($entry_id);
     }
 }, 10, 2);

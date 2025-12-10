@@ -24,9 +24,11 @@ class Manager
         $defaults = [
             'start' => '2025-12-01 12:00:00',
             'end' => '2025-12-24 23:59:00',
+            'timezone' => 'Asia/Kuala_Lumpur',
             'form_id' => 13,
             'promo_field_id' => 3170,
             'daftar_field_id' => 196,
+            'daftar_trigger_value' => 'Ya',
             'status_field_id' => 199,
             'pasif_date_field_id' => 1698,
             'max' => 480,
@@ -45,8 +47,14 @@ class Manager
 
     public function is_active()
     {
-        // interpret start/end as Asia/Kuala_Lumpur, compare in site tz
-        $tz = new \DateTimeZone('Asia/Kuala_Lumpur');
+        // interpret start/end as configured timezone, compare in site tz
+        $tz_string = $this->s('timezone') ?: 'Asia/Kuala_Lumpur';
+        try {
+            $tz = new \DateTimeZone($tz_string);
+        } catch (\Exception $e) {
+            $tz = new \DateTimeZone('Asia/Kuala_Lumpur');
+        }
+
         try {
             $start = new \DateTimeImmutable($this->s('start'), $tz);
             $end = new \DateTimeImmutable($this->s('end'), $tz);
