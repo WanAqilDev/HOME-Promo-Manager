@@ -1,7 +1,8 @@
 <?php
 namespace HPM;
 
-if (!defined('ABSPATH')) exit;
+if (!defined('ABSPATH'))
+    exit;
 
 /**
  * Admin settings page for HOME Promo Manager
@@ -12,7 +13,7 @@ if (!defined('ABSPATH')) exit;
  */
 
 // Register admin menu and settings
-add_action('admin_menu', function() {
+add_action('admin_menu', function () {
     add_options_page(
         'HOME Promo Manager',
         'HOME Promo Manager',
@@ -22,7 +23,7 @@ add_action('admin_menu', function() {
     );
 });
 
-add_action('admin_init', function() {
+add_action('admin_init', function () {
     register_setting('hpm_settings_group', 'home_promo_manager_settings', [
         'sanitize_callback' => '\\HPM\\sanitize_settings'
     ]);
@@ -34,16 +35,20 @@ add_action('admin_init', function() {
  * @param array $input
  * @return array sanitized
  */
-function sanitize_settings($input) {
+function sanitize_settings($input)
+{
     $defaults = get_option('home_promo_manager_settings', []);
     $out = [];
 
     $out['start'] = sanitize_text_field($input['start'] ?? ($defaults['start'] ?? '2025-12-01 12:00:00'));
-    $out['end']   = sanitize_text_field($input['end'] ?? ($defaults['end'] ?? '2025-12-24 23:59:00'));
+    $out['end'] = sanitize_text_field($input['end'] ?? ($defaults['end'] ?? '2025-12-24 23:59:00'));
+    $out['timezone'] = sanitize_text_field($input['timezone'] ?? ($defaults['timezone'] ?? 'Asia/Kuala_Lumpur'));
+    $out['debug_mode'] = isset($input['debug_mode']) ? (bool) $input['debug_mode'] : false;
 
     $out['form_id'] = isset($input['form_id']) ? absint($input['form_id']) : absint($defaults['form_id'] ?? 13);
     $out['promo_field_id'] = isset($input['promo_field_id']) ? absint($input['promo_field_id']) : absint($defaults['promo_field_id'] ?? 3170);
     $out['daftar_field_id'] = isset($input['daftar_field_id']) ? absint($input['daftar_field_id']) : absint($defaults['daftar_field_id'] ?? 196);
+    $out['daftar_trigger_value'] = sanitize_text_field($input['daftar_trigger_value'] ?? ($defaults['daftar_trigger_value'] ?? 'Ya'));
 
     $out['status_field_id'] = isset($input['status_field_id']) ? absint($input['status_field_id']) : absint($defaults['status_field_id'] ?? 209);
     $out['pasif_date_field_id'] = isset($input['pasif_date_field_id']) ? absint($input['pasif_date_field_id']) : absint($defaults['pasif_date_field_id'] ?? 1698);
@@ -63,17 +68,22 @@ function sanitize_settings($input) {
 /**
  * Render the settings page
  */
-function render_admin_page() {
-    if (!current_user_can('manage_options')) wp_die('Insufficient permissions');
+function render_admin_page()
+{
+    if (!current_user_can('manage_options'))
+        wp_die('Insufficient permissions');
 
     // Load current settings (ensures defaults)
     $opts = get_option('home_promo_manager_settings', []);
     $defaults = [
         'start' => '2025-12-01 12:00:00',
         'end' => '2025-12-24 23:59:00',
+        'timezone' => 'Asia/Kuala_Lumpur',
+        'debug_mode' => false,
         'form_id' => 13,
         'promo_field_id' => 3170,
         'daftar_field_id' => 196,
+        'daftar_trigger_value' => 'Ya',
         'status_field_id' => 0,
         'pasif_date_field_id' => 0,
         'max' => 480,
@@ -97,69 +107,209 @@ function render_admin_page() {
     ?>
     <div class="wrap">
         <h1>HOME Promo Manager</h1>
+
+        <style>
+            .hpm-dashboard {
+                display: flex;
+                gap: 20px;
+                margin-bottom: 20px;
+                flex-wrap: wrap;
+            }
+
+            .hpm-card {
+                background: #fff;
+                border: 1px solid #ccd0d4;
+                padding: 15px;
+                border-radius: 4px;
+                flex: 1;
+                min-width: 200px;
+                box-shadow: 0 1px 1px rgba(0, 0, 0, .04);
+            }
+
+            .hpm-card h3 {
+                margin-top: 0;
+                color: #1d2327;
+                font-size: 1.1em;
+            }
+
+            .hpm-stat {
+                font-size: 2em;
+                font-weight: bold;
+                color: #2271b1;
+            }
+
+            .hpm-progress {
+                background: #f0f0f1;
+                height: 20px;
+                border-radius: 10px;
+                overflow: hidden;
+                margin-top: 10px;
+            }
+
+            .hpm-bar {
+                background: #2271b1;
+                height: 100%;
+                transition: width 0.3s ease;
+            }
+
+            .hpm-status-active {
+                color: #00a32a;
+            }
+
+            .hpm-status-inactive {
+                color: #d63638;
+            }
+        </style>
+
+        <?php
+        $mgr = Manager::get_instance();
+        $count = $mgr->get_count();
+        $max = (int) $opts['max'];
+        $percent = $max > 0 ? min(100, ($count / $max) * 100) : 0;
+        $is_active = $mgr->is_active();
+        $status_text = $is_active ? 'Active' : 'Inactive';
+        $status_class = $is_active ? 'hpm-status-active' : 'hpm-status-inactive';
+        $reactivations = DB::count_reactivations();
+        $tier1 = (int) $opts['tier1_max'];
+        $current_tier = ($count < $tier1) ? 'Tier 1' : 'Tier 2';
+        ?>
+
+        <div class="hpm-dashboard">
+            <div class="hpm-card">
+                <h3>Status</h3>
+                <div class="hpm-stat <?php echo $status_class; ?>"><?php echo $status_text; ?></div>
+                <p><?php echo $opts['start']; ?> - <?php echo $opts['end']; ?></p>
+            </div>
+            <div class="hpm-card">
+                <h3>Slots Used</h3>
+                <div class="hpm-stat"><?php echo $count; ?> / <?php echo $max; ?></div>
+                <div class="hpm-progress">
+                    <div class="hpm-bar" style="width: <?php echo $percent; ?>%;"></div>
+                </div>
+            </div>
+            <div class="hpm-card">
+                <h3>Current Tier</h3>
+                <div class="hpm-stat"><?php echo $current_tier; ?></div>
+                <p>Tier 1 Limit: <?php echo $tier1; ?></p>
+            </div>
+            <div class="hpm-card">
+                <h3>Reactivations</h3>
+                <div class="hpm-stat"><?php echo $reactivations; ?></div>
+                <p>Returning Users</p>
+            </div>
+        </div>
+
         <form method="post" action="options.php">
-            <?php settings_fields('hpm_settings_group'); do_settings_sections('hpm_settings_group'); ?>
+            <?php settings_fields('hpm_settings_group');
+            do_settings_sections('hpm_settings_group'); ?>
             <table class="form-table" role="presentation">
                 <tbody>
                     <tr>
                         <th scope="row"><label for="hpm_start">Promo START (Asia/Kuala_Lumpur)</label></th>
                         <td>
-                            <input name="home_promo_manager_settings[start]" type="text" id="hpm_start" value="<?php echo esc_attr($opts['start']); ?>" class="regular-text" />
+                            <input name="home_promo_manager_settings[start]" type="text" id="hpm_start"
+                                value="<?php echo esc_attr($opts['start']); ?>" class="regular-text" />
                             <p class="description">Format: YYYY-MM-DD HH:MM:SS</p>
                         </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="hpm_end">Promo END (Asia/Kuala_Lumpur)</label></th>
                         <td>
-                            <input name="home_promo_manager_settings[end]" type="text" id="hpm_end" value="<?php echo esc_attr($opts['end']); ?>" class="regular-text" />
+                            <input name="home_promo_manager_settings[end]" type="text" id="hpm_end"
+                                value="<?php echo esc_attr($opts['end']); ?>" class="regular-text" />
                             <p class="description">Format: YYYY-MM-DD HH:MM:SS</p>
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row"><label for="hpm_timezone">Timezone</label></th>
+                        <td>
+                            <select name="home_promo_manager_settings[timezone]" id="hpm_timezone">
+                                <?php
+                                $tzlist = \DateTimeZone::listIdentifiers();
+                                foreach ($tzlist as $tz) {
+                                    $selected = ($opts['timezone'] === $tz) ? 'selected' : '';
+                                    echo "<option value='{$tz}' {$selected}>{$tz}</option>";
+                                }
+                                ?>
+                            </select>
+                            <p class="description">Timezone for Start/End times.</p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><label for="hpm_form">Form ID</label></th>
-                        <td><input name="home_promo_manager_settings[form_id]" type="number" id="hpm_form" value="<?php echo esc_attr($opts['form_id']); ?>" class="small-text" /></td>
+                        <td><input name="home_promo_manager_settings[form_id]" type="number" id="hpm_form"
+                                value="<?php echo esc_attr($opts['form_id']); ?>" class="small-text" /></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="hpm_promo_field">Promo Field ID</label></th>
-                        <td><input name="home_promo_manager_settings[promo_field_id]" type="number" id="hpm_promo_field" value="<?php echo esc_attr($opts['promo_field_id']); ?>" class="small-text" /></td>
+                        <td><input name="home_promo_manager_settings[promo_field_id]" type="number" id="hpm_promo_field"
+                                value="<?php echo esc_attr($opts['promo_field_id']); ?>" class="small-text" /></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="hpm_daftar_field">Daftar Field ID</label></th>
-                        <td><input name="home_promo_manager_settings[daftar_field_id]" type="number" id="hpm_daftar_field" value="<?php echo esc_attr($opts['daftar_field_id']); ?>" class="small-text" /></td>
+                        <td><input name="home_promo_manager_settings[daftar_field_id]" type="number" id="hpm_daftar_field"
+                                value="<?php echo esc_attr($opts['daftar_field_id']); ?>" class="small-text" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="hpm_daftar_trigger">Daftar Trigger Value</label></th>
+                        <td>
+                            <input name="home_promo_manager_settings[daftar_trigger_value]" type="text"
+                                id="hpm_daftar_trigger" value="<?php echo esc_attr($opts['daftar_trigger_value']); ?>"
+                                class="regular-text" />
+                            <p class="description">Value to check against (e.g., 'Ya', 'Yes', '1').</p>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="hpm_status_field">Status Field ID</label></th>
                         <td>
-                            <input name="home_promo_manager_settings[status_field_id]" type="number" id="hpm_status_field" value="<?php echo esc_attr($opts['status_field_id']); ?>" class="small-text" />
+                            <input name="home_promo_manager_settings[status_field_id]" type="number" id="hpm_status_field"
+                                value="<?php echo esc_attr($opts['status_field_id']); ?>" class="small-text" />
                             <p class="description">Field ID for client status (aktif=1, pasif=2). Example: 199</p>
                         </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="hpm_pasif_field">Pasif Date Field ID</label></th>
                         <td>
-                            <input name="home_promo_manager_settings[pasif_date_field_id]" type="number" id="hpm_pasif_field" value="<?php echo esc_attr($opts['pasif_date_field_id']); ?>" class="small-text" />
+                            <input name="home_promo_manager_settings[pasif_date_field_id]" type="number"
+                                id="hpm_pasif_field" value="<?php echo esc_attr($opts['pasif_date_field_id']); ?>"
+                                class="small-text" />
                             <p class="description">Field ID for the date when client became pasif. Example: 1698</p>
                         </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="hpm_max">Max Slots</label></th>
-                        <td><input name="home_promo_manager_settings[max]" type="number" id="hpm_max" value="<?php echo esc_attr($opts['max']); ?>" class="small-text" /></td>
+                        <td><input name="home_promo_manager_settings[max]" type="number" id="hpm_max"
+                                value="<?php echo esc_attr($opts['max']); ?>" class="small-text" /></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="hpm_tier1">Tier1 Max</label></th>
-                        <td><input name="home_promo_manager_settings[tier1_max]" type="number" id="hpm_tier1" value="<?php echo esc_attr($opts['tier1_max']); ?>" class="small-text" /></td>
+                        <td><input name="home_promo_manager_settings[tier1_max]" type="number" id="hpm_tier1"
+                                value="<?php echo esc_attr($opts['tier1_max']); ?>" class="small-text" /></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="hpm_code1">Tier1 Code</label></th>
-                        <td><input name="home_promo_manager_settings[code_tier1]" type="text" id="hpm_code1" value="<?php echo esc_attr($opts['code_tier1']); ?>" class="regular-text" /></td>
+                        <td><input name="home_promo_manager_settings[code_tier1]" type="text" id="hpm_code1"
+                                value="<?php echo esc_attr($opts['code_tier1']); ?>" class="regular-text" /></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="hpm_code2">Tier2 Code</label></th>
-                        <td><input name="home_promo_manager_settings[code_tier2]" type="text" id="hpm_code2" value="<?php echo esc_attr($opts['code_tier2']); ?>" class="regular-text" /></td>
+                        <td><input name="home_promo_manager_settings[code_tier2]" type="text" id="hpm_code2"
+                                value="<?php echo esc_attr($opts['code_tier2']); ?>" class="regular-text" /></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="hpm_email">Admin Email</label></th>
-                        <td><input name="home_promo_manager_settings[admin_email]" type="email" id="hpm_email" value="<?php echo esc_attr($opts['admin_email']); ?>" class="regular-text" /></td>
+                        <td><input name="home_promo_manager_settings[admin_email]" type="email" id="hpm_email"
+                                value="<?php echo esc_attr($opts['admin_email']); ?>" class="regular-text" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="hpm_debug">Debug Mode</label></th>
+                        <td>
+                            <label>
+                                <input name="home_promo_manager_settings[debug_mode]" type="checkbox" id="hpm_debug"
+                                    value="1" <?php checked(1, $opts['debug_mode']); ?> />
+                                Enable debug logging to error_log
+                            </label>
+                        </td>
                     </tr>
                 </tbody>
             </table>

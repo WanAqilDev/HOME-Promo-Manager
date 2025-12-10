@@ -56,6 +56,24 @@ A WordPress plugin to manage and track promotional slots for HOME campaigns, wit
 
 For issues or feature requests, contact Wan Aqil Hazim, QCXIS Sdn Bhd.
 
+## Testing & Verification
+
+To verify the reactivation logic:
+
+1.  **Prerequisites**:
+    *   Ensure you have a user entry in Form 13 with status '2' (Pasif).
+    *   Ensure the 'Pasif Date' field for that entry is set to a date more than 90 days ago.
+
+2.  **Test Reactivation**:
+    *   Edit the entry in Form 13 (via admin or frontend).
+    *   Change the status from '2' (Pasif) to '1' (Aktif).
+    *   Save the entry.
+
+3.  **Verify Result**:
+    *   Check the entry meta: The 'Promo Code' field should now be populated with a new code.
+    *   Check the database: A new row should be added to the `home_promo_reactivations` table.
+    *   Check the counter: The total slot count should increment by 1.
+
 ---
 
 **Version:** 1.4.0
