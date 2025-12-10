@@ -19,7 +19,13 @@ class Manager
 
     private function __construct()
     {
-        $this->settings = isset($GLOBALS['get_option']) ? $GLOBALS['get_option']('home_promo_manager_settings', []) : [];
+        if (function_exists('get_option')) {
+            $this->settings = get_option('home_promo_manager_settings', []);
+        } elseif (isset($GLOBALS['get_option'])) {
+            $this->settings = $GLOBALS['get_option']('home_promo_manager_settings', []);
+        } else {
+            $this->settings = [];
+        }
         // ensure sensible defaults
         $defaults = [
             'start' => '2099-01-01 00:00:00', // Default to future to prevent accidental activation
@@ -36,9 +42,15 @@ class Manager
             'code_tier1' => 'promo24',
             'code_tier2' => 'promo12',
             'debug_mode' => false,
-            'admin_email' => isset($GLOBALS['get_option']) ? $GLOBALS['get_option']('admin_email') : '',
+            'admin_email' => function_exists('get_option') ? get_option('admin_email') : (isset($GLOBALS['get_option']) ? $GLOBALS['get_option']('admin_email') : ''),
         ];
-        $this->settings = isset($GLOBALS['wp_parse_args']) ? $GLOBALS['wp_parse_args']($this->settings, $defaults) : $defaults;
+        if (function_exists('wp_parse_args')) {
+            $this->settings = wp_parse_args($this->settings, $defaults);
+        } elseif (isset($GLOBALS['wp_parse_args'])) {
+            $this->settings = $GLOBALS['wp_parse_args']($this->settings, $defaults);
+        } else {
+            $this->settings = array_merge($defaults, $this->settings);
+        }
 
         if ($this->s('debug_mode')) {
             error_log('[HPM-DEBUG] Manager initialized. Settings: ' . print_r($this->settings, true));
@@ -127,7 +139,9 @@ class Manager
         if (in_array($count, [$tier1, ($tier1 * 2), $max], true)) {
             $subject = 'HOME Promo – milestone';
             $msg = "Entry: {$entry_id}\nCode: {$code}\nTotal: {$count}/{$max}";
-            if (isset($GLOBALS['wp_mail'])) {
+            if (function_exists('wp_mail')) {
+                wp_mail($this->s('admin_email'), $subject, $msg);
+            } elseif (isset($GLOBALS['wp_mail'])) {
                 $GLOBALS['wp_mail']($this->s('admin_email'), $subject, $msg);
             }
         }
