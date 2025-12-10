@@ -24,7 +24,11 @@ define('HOME_PROMO_MANAGER_DIR', plugin_dir_path(__FILE__));
 define('HOME_PROMO_MANAGER_VERSION', '0.1.2');
 
 // Bootstrap
+require_once __DIR__ . '/src/utils.php';
 require_once __DIR__ . '/src/db.php';
+require_once __DIR__ . '/src/Manager.php';
+require_once __DIR__ . '/src/admin.php';
+require_once __DIR__ . '/src/rest.php';
 require_once __DIR__ . '/src/templates.php';
 require_once __DIR__ . '/src/hooks.php';
 
