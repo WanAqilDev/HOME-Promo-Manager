@@ -195,14 +195,35 @@ add_action('frm_after_update_entry', function ($entry_id, $form_id) {
         if ($mgr->s('debug_mode'))
             error_log(sprintf('[HPM-DEBUG] Days inactive: %.2f', $days_inactive));
 
-        if ($days_inactive > 90) {
+        // Edge Case: Partial Registration
+        // If pasif_date is the same day as entry creation date, it means they partially registered.
+        // We should allow them to activate even if < 90 days.
+        $is_partial = false;
+        $entry = \FrmEntry::getOne($entry_id);
+        if ($entry && !empty($entry->created_at)) {
+            try {
+                $created_dt = new \DateTime($entry->created_at, new \DateTimeZone('UTC')); // DB is usually UTC
+                $created_dt->setTimezone($tz); // Convert to configured TZ
+
+                // $dt is the pasif_date object created earlier
+                if ($dt && $created_dt->format('Y-m-d') === $dt->format('Y-m-d')) {
+                    $is_partial = true;
+                    if ($mgr->s('debug_mode'))
+                        error_log('[HPM-DEBUG] Partial registration detected (Created == PasifDate). Bypassing 90-day check.');
+                }
+            } catch (\Exception $e) {
+                error_log('[HPM-DEBUG] Error checking partial registration dates: ' . $e->getMessage());
+            }
+        }
+
+        if ($days_inactive > 90 || $is_partial) {
             if ($mgr->s('debug_mode'))
                 error_log('[HPM-DEBUG] QUALIFIED! Triggering reactivation.');
             // Process reactivation
             $mgr->record_reactivation($entry_id, $old_status, $new_status, $old_pasif);
         } else {
             if ($mgr->s('debug_mode'))
-                error_log('[HPM-DEBUG] Not qualified (<= 90 days).');
+                error_log('[HPM-DEBUG] Not qualified (<= 90 days and not partial).');
         }
     } else {
         if ($mgr->s('debug_mode'))
