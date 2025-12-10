@@ -39,6 +39,10 @@ class Manager
             'admin_email' => isset($GLOBALS['get_option']) ? $GLOBALS['get_option']('admin_email') : '',
         ];
         $this->settings = isset($GLOBALS['wp_parse_args']) ? $GLOBALS['wp_parse_args']($this->settings, $defaults) : $defaults;
+
+        if ($this->s('debug_mode')) {
+            error_log('[HPM-DEBUG] Manager initialized. Settings: ' . print_r($this->settings, true));
+        }
     }
 
     public function s($key)
@@ -67,7 +71,21 @@ class Manager
         $siteTz = $tz;
         $start = $start->setTimezone($siteTz);
         $end = $end->setTimezone($siteTz);
-        return ($now >= $start && $now < $end);
+        $end = $end->setTimezone($siteTz);
+
+        $active = ($now >= $start && $now < $end);
+
+        if ($this->s('debug_mode')) {
+            error_log(sprintf(
+                '[HPM-DEBUG] is_active check: Now=%s, Start=%s, End=%s, Result=%s',
+                $now->format('Y-m-d H:i:s'),
+                $start->format('Y-m-d H:i:s'),
+                $end->format('Y-m-d H:i:s'),
+                $active ? 'TRUE' : 'FALSE'
+            ));
+        }
+
+        return $active;
     }
 
     public function get_count()
