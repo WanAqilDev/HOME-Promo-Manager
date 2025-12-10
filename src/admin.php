@@ -240,22 +240,22 @@ function render_admin_page()
                 <h3>Reactivations</h3>
                 <div class="hpm-stat"><?php echo $reactivations; ?></div>
                 <p>Returning Users</p>
-                <div class="hpm-card">
-                    <h3>Promo Page</h3>
-                    <?php if ($promo_page_url): ?>
-                        <div class="hpm-stat" style="font-size: 1.2em; margin-bottom: 10px;">
-                            <a href="<?php echo esc_url($promo_page_url); ?>" target="_blank" class="button button-primary">View
-                                Page</a>
-                        </div>
-                        <p>Template: Promo Countdown 12.12</p>
-                    <?php else: ?>
-                        <form method="post">
-                            <?php wp_nonce_field('hpm_create_page', 'hpm_create_page_nonce'); ?>
-                            <button type="submit" name="hpm_create_page" class="button button-primary">Create Page</button>
-                        </form>
-                        <p>Auto-create page with template</p>
-                    <?php endif; ?>
-                </div>
+            </div>
+            <div class="hpm-card">
+                <h3>Promo Page</h3>
+                <?php if ($promo_page_url): ?>
+                    <div class="hpm-stat" style="font-size: 1.2em; margin-bottom: 10px;">
+                        <a href="<?php echo esc_url($promo_page_url); ?>" target="_blank" class="button button-primary">View
+                            Page</a>
+                    </div>
+                    <p>Template: Promo Countdown 12.12</p>
+                <?php else: ?>
+                    <form method="post">
+                        <?php wp_nonce_field('hpm_create_page', 'hpm_create_page_nonce'); ?>
+                        <button type="submit" name="hpm_create_page" class="button button-primary">Create Page</button>
+                    </form>
+                    <p>Auto-create page with template</p>
+                <?php endif; ?>
             </div>
 
             <form method="post" action="options.php">
