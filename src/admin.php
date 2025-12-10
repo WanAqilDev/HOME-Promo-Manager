@@ -147,7 +147,7 @@ function render_admin_page()
                 display: flex;
                 gap: 20px;
                 margin-bottom: 20px;
-                flex-wrap: wrap;
+                align-items: stretch;
             }
 
             .hpm-card {
@@ -156,7 +156,6 @@ function render_admin_page()
                 padding: 15px;
                 border-radius: 4px;
                 flex: 1;
-                min-width: 200px;
                 box-shadow: 0 1px 1px rgba(0, 0, 0, .04);
             }
 
