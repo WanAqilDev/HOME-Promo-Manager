@@ -82,7 +82,8 @@ class Manager
     public function record_activation($entry_id)
     {
         // return true if newly recorded
-        $inserted = DB::insert_entry($entry_id);
+        $max = (int) $this->s('max');
+        $inserted = DB::insert_entry($entry_id, $max);
         if (!$inserted)
             return false;
         // write promo code into entry meta if Formidable available (best-effort)
@@ -149,7 +150,8 @@ class Manager
 
         // Count this as an activation
         error_log('[HPM] Counting reactivation as activation');
-        DB::insert_entry($entry_id);
+        $max = (int) $this->s('max');
+        DB::insert_entry($entry_id, $max);
 
         error_log('[HPM] Reactivation complete for entry ' . $entry_id);
         return true;
