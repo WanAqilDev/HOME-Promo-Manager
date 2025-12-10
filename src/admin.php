@@ -43,6 +43,7 @@ function sanitize_settings($input)
     $out['start'] = sanitize_text_field($input['start'] ?? ($defaults['start'] ?? '2025-12-01 12:00:00'));
     $out['end'] = sanitize_text_field($input['end'] ?? ($defaults['end'] ?? '2025-12-24 23:59:00'));
     $out['timezone'] = sanitize_text_field($input['timezone'] ?? ($defaults['timezone'] ?? 'Asia/Kuala_Lumpur'));
+    $out['debug_mode'] = isset($input['debug_mode']) ? (bool) $input['debug_mode'] : false;
 
     $out['form_id'] = isset($input['form_id']) ? absint($input['form_id']) : absint($defaults['form_id'] ?? 13);
     $out['promo_field_id'] = isset($input['promo_field_id']) ? absint($input['promo_field_id']) : absint($defaults['promo_field_id'] ?? 3170);
@@ -78,6 +79,7 @@ function render_admin_page()
         'start' => '2025-12-01 12:00:00',
         'end' => '2025-12-24 23:59:00',
         'timezone' => 'Asia/Kuala_Lumpur',
+        'debug_mode' => false,
         'form_id' => 13,
         'promo_field_id' => 3170,
         'daftar_field_id' => 196,
@@ -105,6 +107,98 @@ function render_admin_page()
     ?>
     <div class="wrap">
         <h1>HOME Promo Manager</h1>
+
+        <style>
+            .hpm-dashboard {
+                display: flex;
+                gap: 20px;
+                margin-bottom: 20px;
+                flex-wrap: wrap;
+            }
+
+            .hpm-card {
+                background: #fff;
+                border: 1px solid #ccd0d4;
+                padding: 15px;
+                border-radius: 4px;
+                flex: 1;
+                min-width: 200px;
+                box-shadow: 0 1px 1px rgba(0, 0, 0, .04);
+            }
+
+            .hpm-card h3 {
+                margin-top: 0;
+                color: #1d2327;
+                font-size: 1.1em;
+            }
+
+            .hpm-stat {
+                font-size: 2em;
+                font-weight: bold;
+                color: #2271b1;
+            }
+
+            .hpm-progress {
+                background: #f0f0f1;
+                height: 20px;
+                border-radius: 10px;
+                overflow: hidden;
+                margin-top: 10px;
+            }
+
+            .hpm-bar {
+                background: #2271b1;
+                height: 100%;
+                transition: width 0.3s ease;
+            }
+
+            .hpm-status-active {
+                color: #00a32a;
+            }
+
+            .hpm-status-inactive {
+                color: #d63638;
+            }
+        </style>
+
+        <?php
+        $mgr = Manager::get_instance();
+        $count = $mgr->get_count();
+        $max = (int) $opts['max'];
+        $percent = $max > 0 ? min(100, ($count / $max) * 100) : 0;
+        $is_active = $mgr->is_active();
+        $status_text = $is_active ? 'Active' : 'Inactive';
+        $status_class = $is_active ? 'hpm-status-active' : 'hpm-status-inactive';
+        $reactivations = DB::count_reactivations();
+        $tier1 = (int) $opts['tier1_max'];
+        $current_tier = ($count < $tier1) ? 'Tier 1' : 'Tier 2';
+        ?>
+
+        <div class="hpm-dashboard">
+            <div class="hpm-card">
+                <h3>Status</h3>
+                <div class="hpm-stat <?php echo $status_class; ?>"><?php echo $status_text; ?></div>
+                <p><?php echo $opts['start']; ?> - <?php echo $opts['end']; ?></p>
+            </div>
+            <div class="hpm-card">
+                <h3>Slots Used</h3>
+                <div class="hpm-stat"><?php echo $count; ?> / <?php echo $max; ?></div>
+                <div class="hpm-progress">
+                    <div class="hpm-bar" style="width: <?php echo $percent; ?>%;"></div>
+                </div>
+            </div>
+            <div class="hpm-card">
+                <h3>Current Tier</h3>
+                <div class="hpm-stat"><?php echo $current_tier; ?></div>
+                <p>Tier 1 Limit: <?php echo $tier1; ?></p>
+            </div>
+            <div class="hpm-card">
+                <h3>Reactivations</h3>
+                <div class="hpm-stat"><?php echo $reactivations; ?></div>
+                <p>Returning Users</p>
+            </div>
+        </div>
+
         <form method="post" action="options.php">
             <?php settings_fields('hpm_settings_group');
             do_settings_sections('hpm_settings_group'); ?>
@@ -206,6 +300,16 @@ function render_admin_page()
                         <th scope="row"><label for="hpm_email">Admin Email</label></th>
                         <td><input name="home_promo_manager_settings[admin_email]" type="email" id="hpm_email"
                                 value="<?php echo esc_attr($opts['admin_email']); ?>" class="regular-text" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="hpm_debug">Debug Mode</label></th>
+                        <td>
+                            <label>
+                                <input name="home_promo_manager_settings[debug_mode]" type="checkbox" id="hpm_debug"
+                                    value="1" <?php checked(1, $opts['debug_mode']); ?> />
+                                Enable debug logging to error_log
+                            </label>
+                        </td>
                     </tr>
                 </tbody>
             </table>

@@ -238,4 +238,11 @@ class DB
 
         return $count > 0;
     }
+
+    public static function count_reactivations()
+    {
+        global $wpdb;
+        $table = self::reactivation_table_name();
+        return (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table}");
+    }
 }

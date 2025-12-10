@@ -35,6 +35,7 @@ class Manager
             'tier1_max' => 240,
             'code_tier1' => 'promo24',
             'code_tier2' => 'promo12',
+            'debug_mode' => false,
             'admin_email' => isset($GLOBALS['get_option']) ? $GLOBALS['get_option']('admin_email') : '',
         ];
         $this->settings = isset($GLOBALS['wp_parse_args']) ? $GLOBALS['wp_parse_args']($this->settings, $defaults) : $defaults;
@@ -154,7 +155,16 @@ class Manager
         // Mark entry as reactivated with a flag
         error_log('[HPM] Setting reactivation flags');
         ff_update_entry_meta($entry_id, 9999, 'yes'); // Use a custom field ID for reactivation flag
-        ff_update_entry_meta($entry_id, 9998, date('Y-m-d H:i:s')); // Use a custom field ID for reactivation date
+
+        // Use configured timezone for the date
+        $tz_string = $this->s('timezone') ?: 'Asia/Kuala_Lumpur';
+        try {
+            $tz = new \DateTimeZone($tz_string);
+        } catch (\Exception $e) {
+            $tz = new \DateTimeZone('Asia/Kuala_Lumpur');
+        }
+        $now = new \DateTime('now', $tz);
+        ff_update_entry_meta($entry_id, 9998, $now->format('Y-m-d H:i:s')); // Use a custom field ID for reactivation date
 
         // Count this as an activation
         error_log('[HPM] Counting reactivation as activation');
