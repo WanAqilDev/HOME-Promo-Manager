@@ -22,8 +22,8 @@ class Manager
         $this->settings = isset($GLOBALS['get_option']) ? $GLOBALS['get_option']('home_promo_manager_settings', []) : [];
         // ensure sensible defaults
         $defaults = [
-            'start' => '2025-12-01 12:00:00',
-            'end' => '2025-12-24 23:59:00',
+            'start' => '2099-01-01 00:00:00', // Default to future to prevent accidental activation
+            'end' => '2099-01-01 23:59:00',
             'timezone' => 'Asia/Kuala_Lumpur',
             'form_id' => 13,
             'promo_field_id' => 3170,
@@ -75,9 +75,9 @@ class Manager
 
         $active = ($now >= $start && $now < $end);
 
-        if ($this->s('debug_mode')) {
+        if ($this->s('debug_mode') || true) { // FORCE LOGGING TEMPORARILY
             error_log(sprintf(
-                '[HPM-DEBUG] is_active check: Now=%s, Start=%s, End=%s, Result=%s',
+                '[HPM-DEBUG-FORCE] is_active check: Now=%s, Start=%s, End=%s, Result=%s',
                 $now->format('Y-m-d H:i:s'),
                 $start->format('Y-m-d H:i:s'),
                 $end->format('Y-m-d H:i:s'),
