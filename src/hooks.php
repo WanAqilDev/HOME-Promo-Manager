@@ -105,6 +105,9 @@ add_action('frm_pre_update_entry', function ($values, $entry_id) {
     $old_status = ff_get_field_value_robust($entry_id, $status_field);
     $old_pasif = ff_get_field_value_robust($entry_id, $pasif_field);
 
+    $daftar_field = (int) $mgr->s('daftar_field_id');
+    $old_daftar = ff_get_field_value_robust($entry_id, $daftar_field);
+
     if ($mgr->s('debug_mode')) {
         error_log(sprintf('[HPM-DEBUG] Captured OLD: Status=%s, PasifDate=%s', var_export($old_status, true), var_export($old_pasif, true)));
     }
@@ -112,6 +115,7 @@ add_action('frm_pre_update_entry', function ($values, $entry_id) {
     $prev_data = [
         'status' => $old_status,
         'pasif_date' => $old_pasif,
+        'daftar' => $old_daftar,
     ];
 
     // Use 5-minute expiry
@@ -157,7 +161,9 @@ add_action('frm_after_update_entry', function ($entry_id, $form_id) {
     }
 
     $old_status = $prev['status'] ?? null;
+    $old_status = $prev['status'] ?? null;
     $old_pasif = $prev['pasif_date'] ?? null;
+    $old_daftar = $prev['daftar'] ?? null;
 
     if ($mgr->s('debug_mode')) {
         error_log(sprintf('[HPM-DEBUG] Retrieved OLD from transient: Status=%s, PasifDate=%s', var_export($old_status, true), var_export($old_pasif, true)));
@@ -230,5 +236,18 @@ add_action('frm_after_update_entry', function ($entry_id, $form_id) {
     } else {
         if ($mgr->s('debug_mode'))
             error_log('[HPM-DEBUG] Conditions not met.');
+    }
+
+    // Check for Daftar status change (Tidak -> Ya)
+    // This handles users who initially said "Tidak" but changed to "Ya" later
+    $daftar_field = (int) $mgr->s('daftar_field_id');
+    $new_daftar = ff_get_field_value_robust($entry_id, $daftar_field);
+    $trigger_val = $mgr->s('daftar_trigger_value') ?: 'Ya';
+
+    if ($new_daftar === $trigger_val && $old_daftar !== $trigger_val) {
+        if ($mgr->s('debug_mode')) {
+            error_log(sprintf('[HPM-DEBUG] Daftar status changed from %s to %s. Triggering activation.', var_export($old_daftar, true), var_export($new_daftar, true)));
+        }
+        $mgr->record_activation($entry_id);
     }
 }, 10, 2);
