@@ -5,6 +5,24 @@ $green = '#62be4d';
 $pink = '#ff1a8c';
 
 $api_url = get_rest_url(null, 'promo/v1/counter');
+
+// Server-side time calculation for immediate clock rendering
+$server_target_ts = 0;
+if (class_exists('\HPM\Manager')) {
+    $mgr = \HPM\Manager::get_instance();
+    try {
+        $tz_string = $mgr->s('timezone') ?: 'Asia/Kuala_Lumpur';
+        try {
+            $tz = new \DateTimeZone($tz_string);
+        } catch (\Exception $e) {
+            $tz = new \DateTimeZone('Asia/Kuala_Lumpur');
+        }
+        $end_dt = new \DateTimeImmutable($mgr->s('end'), $tz);
+        $server_target_ts = $end_dt->setTimezone(new \DateTimeZone('UTC'))->getTimestamp() * 1000;
+    } catch (\Exception $e) {
+        $server_target_ts = 0;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
@@ -13,12 +31,32 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
     <meta charset="<?php bloginfo('charset'); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php the_title(); ?> – 12.12 Promo</title>
+    <link rel="icon" href="data:,">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Fredoka:wght@600;700&family=Modak&display=swap"
         rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Note: Tailwind CDN is used for simplicity. For production, a build step is recommended to avoid console warnings. -->
+    <script src="https://cdn.tailwindcss.com/3.4.1"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brandblue: '<?= $bg_blue ?>',
+                        brandgreen: '<?= $green ?>',
+                        brandpink: '<?= $pink ?>',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Fredoka', 'sans-serif'],
+                        mono: ['Modak', 'cursive'],
+                    }
+                }
+            }
+        }
+    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
@@ -30,6 +68,18 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
             font-family: 'Inter', sans-serif;
             margin: 0;
             overflow-x: hidden;
+            /* Critical Fallback CSS */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        main {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
 
         /* Clouds (kept exactly the same) */
@@ -357,7 +407,7 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
 
     <script>
         const API_ENDPOINT = "<?= $api_url ?>";
-        let targetTs = 0;
+        let targetTs = <?= $server_target_ts ?>;
         const ORIGINAL_PRICE = 200.00;
         const PRICE_FORMAT = new Intl.NumberFormat('en-MY', { style: 'currency', currency: 'MYR', minimumFractionDigits: 2 });
 

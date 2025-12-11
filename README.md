@@ -76,6 +76,6 @@ To verify the reactivation logic:
 
 ---
 
-**Version:** 0.1.4
+**Version:** 0.1.5
 **Author:** Wan Aqil Hazim, QCXIS Sdn Bhd
 **Requires PHP:** 7.4+
