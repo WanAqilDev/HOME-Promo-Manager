@@ -171,26 +171,23 @@ if (class_exists('\HPM\Manager')) {
 
         .big-title .promosi {
             font-size: clamp(3.5rem, 12vw, 7rem);
-            color:
-                <?= $green ?>
-            ;
+            color: <?= $green ?>;
+            -webkit-text-fill-color: <?= $green ?>;
         }
 
         .big-title .number {
             font-family: 'Modak', cursive;
             font-size: clamp(6.5rem, 25vw, 16rem);
-            color:
-                <?= $pink ?>
-            ;
+            color: <?= $pink ?>;
+            -webkit-text-fill-color: <?= $pink ?>;
             -webkit-text-stroke: 10px white;
             margin: -20px 0 -10px;
         }
 
         .big-title .ozem {
             font-size: clamp(3.5rem, 11vw, 6.5rem);
-            color:
-                <?= $pink ?>
-            ;
+            color: <?= $pink ?>;
+            -webkit-text-fill-color: <?= $pink ?>;
         }
 
         /* Clock – fixed & responsive */
@@ -332,6 +329,7 @@ if (class_exists('\HPM\Manager')) {
             color: #64748b;
             font-weight: 500;
             margin-top: auto;
+            width: 100%;
         }
     </style>
 </head>
