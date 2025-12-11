@@ -160,34 +160,31 @@ if (class_exists('\HPM\Manager')) {
 
         /* Big stacked title */
         .big-title {
-            font-family: 'Fredoka', sans-serif;
-            font-weight: 700;
-            line-height: 0.95;
+            line-height: 0.92;
             text-align: center;
-            -webkit-text-stroke: 6px white;
-            paint-order: stroke fill;
-            text-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            font-weight: 700;
         }
 
         .big-title .promosi {
-            font-size: clamp(3.5rem, 12vw, 7rem);
+            font-family: 'Fredoka', sans-serif;
+            font-size: clamp(2.8rem, 10vw, 6rem);
             color: <?= $green ?>;
-            -webkit-text-fill-color: <?= $green ?>;
+            text-shadow: -5px -5px 0 #fff, 5px -5px 0 #fff, -5px 5px 0 #fff, 5px 5px 0 #fff, -5px 0 0 #fff, 5px 0 0 #fff, 0 -5px 0 #fff, 0 5px 0 #fff;
         }
 
         .big-title .number {
             font-family: 'Modak', cursive;
-            font-size: clamp(6.5rem, 25vw, 16rem);
+            font-size: clamp(5.5rem, 22vw, 15rem);
             color: <?= $pink ?>;
-            -webkit-text-fill-color: <?= $pink ?>;
-            -webkit-text-stroke: 10px white;
+            text-shadow: -9px -9px 0 #fff, 9px -9px 0 #fff, -9px 9px 0 #fff, 9px 9px 0 #fff, -9px 0 0 #fff, 9px 0 0 #fff, 0 -9px 0 #fff, 0 9px 0 #fff;
             margin: -20px 0 -10px;
         }
 
         .big-title .ozem {
-            font-size: clamp(3.5rem, 11vw, 6.5rem);
+            font-family: 'Fredoka', sans-serif;
+            font-size: clamp(2.8rem, 9vw, 5.5rem);
             color: <?= $pink ?>;
-            -webkit-text-fill-color: <?= $pink ?>;
+            text-shadow: -5px -5px 0 #fff, 5px -5px 0 #fff, -5px 5px 0 #fff, 5px 5px 0 #fff, -5px 0 0 #fff, 5px 0 0 #fff, 0 -5px 0 #fff, 0 5px 0 #fff;
         }
 
         /* Clock – fixed & responsive */
