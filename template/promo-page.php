@@ -37,8 +37,8 @@ if (class_exists('\HPM\Manager')) {
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Fredoka:wght@600;700&family=Modak&display=swap"
         rel="stylesheet">
-    <!-- Note: Tailwind CDN is used for simplicity. For production, a build step is recommended to avoid console warnings. -->
-    <script src="https://cdn.tailwindcss.com/3.4.1"></script>
+    <!-- Note: Tailwind is vendored locally for reliability. -->
+    <script src="<?= HOME_PROMO_MANAGER_URL ?>assets/js/tailwindcss.js"></script>
     <script>
         tailwind.config = {
             theme: {
