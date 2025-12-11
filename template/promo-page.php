@@ -160,31 +160,43 @@ if (class_exists('\HPM\Manager')) {
 
         /* Big stacked title */
         .big-title {
+            font-family: 'Fredoka', sans-serif;
+            font-weight: 700;
             line-height: 0.92;
             text-align: center;
-            font-weight: 700;
+            position: relative;
         }
 
+        /* PROMOSI – Green with thick white stroke */
         .big-title .promosi {
-            font-family: 'Fredoka', sans-serif;
             font-size: clamp(2.8rem, 10vw, 6rem);
             color: <?= $green ?>;
-            text-shadow: -5px -5px 0 #fff, 5px -5px 0 #fff, -5px 5px 0 #fff, 5px 5px 0 #fff, -5px 0 0 #fff, 5px 0 0 #fff, 0 -5px 0 #fff, 0 5px 0 #fff;
+            /* Hybrid approach for cross-browser consistency */
+            text-shadow: 
+                -5px -5px 0 white, 5px -5px 0 white, -5px 5px 0 white, 5px 5px 0 white,
+                -5px 0 0 white, 5px 0 0 white, 0 -5px 0 white, 0 5px 0 white;
+            paint-order: stroke fill;
         }
 
+        /* 12.12 – Pink with super thick white stroke */
         .big-title .number {
             font-family: 'Modak', cursive;
             font-size: clamp(5.5rem, 22vw, 15rem);
             color: <?= $pink ?>;
-            text-shadow: -9px -9px 0 #fff, 9px -9px 0 #fff, -9px 9px 0 #fff, 9px 9px 0 #fff, -9px 0 0 #fff, 9px 0 0 #fff, 0 -9px 0 #fff, 0 9px 0 #fff;
+            text-shadow: 
+                -9px -9px 0 white, 9px -9px 0 white, -9px 9px 0 white, 9px 9px 0 white,
+                -9px 0 0 white, 9px 0 0 white, 0 -9px 0 white, 0 9px 0 white;
+            -webkit-text-stroke: 6px white;
             margin: -20px 0 -10px;
         }
 
+        /* OZEM DEALS – Pink */
         .big-title .ozem {
-            font-family: 'Fredoka', sans-serif;
             font-size: clamp(2.8rem, 9vw, 5.5rem);
             color: <?= $pink ?>;
-            text-shadow: -5px -5px 0 #fff, 5px -5px 0 #fff, -5px 5px 0 #fff, 5px 5px 0 #fff, -5px 0 0 #fff, 5px 0 0 #fff, 0 -5px 0 #fff, 0 5px 0 #fff;
+            text-shadow: 
+                -5px -5px 0 white, 5px -5px 0 white, -5px 5px 0 white, 5px 5px 0 white,
+                -5px 0 0 white, 5px 0 0 white, 0 -5px 0 white, 0 5px 0 white;
         }
 
         /* Clock – fixed & responsive */
