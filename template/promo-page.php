@@ -167,26 +167,17 @@ if (class_exists('\HPM\Manager')) {
             position: relative;
         }
 
-        /* PROMOSI – Green with thick white stroke */
-        .big-title .promosi {
-            font-size: clamp(2.8rem, 10vw, 6rem);
-            color: <?= $green ?>;
-            /* Hybrid approach for cross-browser consistency */
-            text-shadow: 
-                -5px -5px 0 white, 5px -5px 0 white, -5px 5px 0 white, 5px 5px 0 white,
-                -5px 0 0 white, 5px 0 0 white, 0 -5px 0 white, 0 5px 0 white;
-            paint-order: stroke fill;
-        }
+
 
         /* 12.12 – Pink with super thick white stroke */
         .big-title .number {
             font-family: 'Modak', cursive;
-            font-size: clamp(5.5rem, 22vw, 15rem);
+            font-size: clamp(5.5rem, 22vw, 13rem);
             color: <?= $pink ?>;
             text-shadow: 
-                -9px -9px 0 white, 9px -9px 0 white, -9px 9px 0 white, 9px 9px 0 white,
-                -9px 0 0 white, 9px 0 0 white, 0 -9px 0 white, 0 9px 0 white;
-            -webkit-text-stroke: 6px white;
+                -5.5px -5.5px 0 white, 5.5px -5.5px 0 white, -5.5px 5.5px 0 white, 5.5px 5.5px 0 white,
+                -5.5px 0 0 white, 5.5px 0 0 white, 0 -5.5px 0 white, 0 5.5px 0 white;
+            -webkit-text-stroke: 3.5px white;
             margin: -20px 0 -10px;
         }
 
@@ -197,6 +188,21 @@ if (class_exists('\HPM\Manager')) {
             text-shadow: 
                 -5px -5px 0 white, 5px -5px 0 white, -5px 5px 0 white, 5px 5px 0 white,
                 -5px 0 0 white, 5px 0 0 white, 0 -5px 0 white, 0 5px 0 white;
+        }
+
+        /* Mobile optimization for stroke/shadow */
+        @media (max-width: 640px) {
+            .big-title .number {
+                text-shadow: 
+                    -3px -3px 0 white, 3px -3px 0 white, -3px 3px 0 white, 3px 3px 0 white,
+                    -3px 0 0 white, 3px 0 0 white, 0 -3px 0 white, 0 3px 0 white;
+                -webkit-text-stroke: 2px white;
+            }
+            .big-title .ozem {
+                text-shadow: 
+                    -3px -3px 0 white, 3px -3px 0 white, -3px 3px 0 white, 3px 3px 0 white,
+                    -3px 0 0 white, 3px 0 0 white, 0 -3px 0 white, 0 3px 0 white;
+            }
         }
 
         /* Clock – fixed & responsive */
@@ -369,7 +375,6 @@ if (class_exists('\HPM\Manager')) {
 
             <!-- BIG TITLE -->
             <div class="big-title mb-4">
-                <div class="promosi">PROMOSI</div>
                 <div class="number">12.12</div>
                 <div class="ozem">OZEM DEALS</div>
             </div>
