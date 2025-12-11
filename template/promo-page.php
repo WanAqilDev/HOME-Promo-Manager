@@ -120,7 +120,7 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
         }
 
         .big-title .promosi {
-            font-size: clamp(2.8rem, 10vw, 6rem);
+            font-size: clamp(3.5rem, 12vw, 7rem);
             color:
                 <?= $green ?>
             ;
@@ -128,7 +128,7 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
 
         .big-title .number {
             font-family: 'Modak', cursive;
-            font-size: clamp(5.5rem, 22vw, 15rem);
+            font-size: clamp(6.5rem, 25vw, 16rem);
             color:
                 <?= $pink ?>
             ;
@@ -137,7 +137,7 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
         }
 
         .big-title .ozem {
-            font-size: clamp(2.8rem, 9vw, 5.5rem);
+            font-size: clamp(3.5rem, 11vw, 6.5rem);
             color:
                 <?= $pink ?>
             ;
@@ -154,6 +154,9 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
         .flip-unit {
             width: 68px;
             height: 88px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
 
             @media (min-width: 480px) {
                 width: 84px;
@@ -174,6 +177,7 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
             align-items: center;
             justify-content: center;
             height: 100%;
+            width: 100%;
         }
 
         @media (max-width: 480px) {
@@ -185,36 +189,41 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
 
         .flip-label {
             color: white;
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 1px;
             text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-            margin-top: 0.5rem;
+            margin-top: 0.25rem;
         }
 
         /* Live stats – side by side on bigger screens */
         .stats-grid {
             display: grid;
-            grid-template-columns: 1fr;
-            gap: 1rem;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
             width: 100%;
-            max-width: 500px;
+            max-width: 600px;
             margin: 1.5rem auto;
         }
 
         @media (min-width: 540px) {
             .stats-grid {
-                grid-template-columns: 1fr 1fr;
+                gap: 1.5rem;
             }
         }
 
         .stat-card {
             background: rgba(255, 255, 255, 0.95);
             border-radius: 16px;
-            padding: 1rem;
+            padding: 0.75rem;
             text-align: center;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
         }
 
         .stat-card.code {
@@ -231,7 +240,7 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
 
         .final-price {
             font-family: 'Fredoka', sans-serif;
-            font-size: 2.8rem;
+            font-size: clamp(2rem, 5vw, 2.8rem);
             font-weight: 700;
             color:
                 <?= $green ?>
@@ -245,7 +254,7 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
 
         .stat-value-slots {
             font-family: 'Fredoka', sans-serif;
-            font-size: 4.5rem;
+            font-size: clamp(3rem, 8vw, 4.5rem);
             color:
                 <?= $green ?>
             ;
@@ -316,13 +325,8 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
             </p>
 
             <!-- COUNTDOWN CLOCK -->
+            <!-- COUNTDOWN CLOCK -->
             <div class="flip-clock" id="flipClock"></div>
-            <div class="flex justify-center gap-4 mt-2">
-                <div class="flip-label">Hari</div>
-                <div class="flip-label">Jam</div>
-                <div class="flip-label">Minit</div>
-                <div class="flip-label">Saat</div>
-            </div>
 
             <!-- LIVE STATS (side-by-side on ≥540px) -->
             <div class="stats-grid" id="liveStats" style="opacity:0;">
@@ -460,11 +464,15 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
 
         // Clock
         let last = [-1, -1, -1, -1];
+        const labels = ['Hari', 'Jam', 'Minit', 'Saat'];
         function render(parts) {
             let html = '';
             parts.forEach((v, i) => {
                 const anim = last[i] !== -1 && last[i] !== v;
-                html += `<div class="flip-unit"><div class="flip-digit${anim ? ' animate__animated animate__flipInY' : ''}">${pad(v)}</div></div>`;
+                html += `<div class="flip-unit">
+                    <div class="flip-digit${anim ? ' animate__animated animate__flipInY' : ''}">${pad(v)}</div>
+                    <div class="flip-label">${labels[i]}</div>
+                </div>`;
             });
             document.getElementById('flipClock').innerHTML = html;
             last = [...parts];
