@@ -159,7 +159,7 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
                 color:
                     <?= $green ?>
                 ;
-                font-size: clamp(3rem, 8vw, 5rem);
+                font-size: clamp(2.5rem, 8vw, 5rem);
                 line-height: 1;
                 -webkit-text-stroke: 8px white;
                 paint-order: stroke fill;
@@ -171,7 +171,7 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
                 color:
                     <?= $pink ?>
                 ;
-                font-size: clamp(8rem, 25vw, 13rem);
+                font-size: clamp(4rem, 20vw, 13rem);
                 line-height: 0.85;
                 -webkit-text-stroke: 12px white;
                 paint-order: stroke fill;
@@ -255,11 +255,10 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
                 text-align: center;
             }
 
-            @media (max-width: 640px) {
-                .flip-unit {
-                    width: 60px;
-                    height: 80px;
-                }
+            .flip-unit {
+                width: 48px;
+                height: 64px;
+            }
             }
 
             .flip-digit {
@@ -280,8 +279,8 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
 
             @media (max-width: 640px) {
                 .flip-digit {
-                    font-size: 2.5rem;
-                    border-radius: 10px;
+                    font-size: 1.8rem;
+                    border-radius: 8px;
                 }
             }
 
@@ -325,14 +324,16 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
 
             @media (max-width: 640px) {
                 .flip-label {
-                    width: 60px;
-                    font-size: 0.7rem;
+                    width: 48px;
+                    font-size: 0.6rem;
                 }
+
                 .flip-clock {
-                    gap: 0.5rem;
+                    gap: 0.3rem;
                 }
+
                 .labels-container {
-                    gap: 0.5rem;
+                    gap: 0.3rem;
                 }
             }
 
@@ -514,7 +515,7 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
                 <div class="pill-discount">POTONGAN DISKAUN SEHINGGA 24%</div>
                 <p class="desc-text">Promosi terhad kepada <em style="color:#F80588;"><b>480 pendaftaran terawal
                             sahaja</b></em>.<br>Jangan lepaskan peluang anda ! </p>
-                <div id="flipClock" class="flip-clock flex-wrap justify-center sm:flex-nowrap"></div>
+                <div id="flipClock" class="flip-clock justify-center"></div>
                 <div class="labels-container"><span class="flip-label">Days</span><span
                         class="flip-label">Hours</span><span class="flip-label">Minutes</span><span
                         class="flip-label">Seconds</span></div>
