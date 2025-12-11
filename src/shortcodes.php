@@ -113,3 +113,118 @@ add_shortcode('promo_realtime_counter', function () {
     <?php
     return ob_get_clean();
 });
+
+/**
+ * Helper to render the popup HTML/CSS
+ */
+function hpm_render_popup($amount_text)
+{
+    $id = uniqid('promo_popup_');
+    ob_start();
+    ?>
+    <style>
+        .modal-overlay-<?php echo $id; ?> {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-box-<?php echo $id; ?> {
+            background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+            border: 4px solid #ff9800;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            max-width: 600px;
+            width: 90%;
+            position: relative;
+            animation: popIn-<?php echo $id; ?> 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .modal-title-<?php echo $id; ?> {
+            color: #e65100;
+            font-family: 'Arial Black', sans-serif;
+            font-size: 2.5rem;
+            margin: 0 0 15px 0;
+            text-transform: uppercase;
+            line-height: 1.1;
+        }
+
+        .modal-message-<?php echo $id; ?> {
+            color: #333;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 25px;
+        }
+
+        .highlight-amount-<?php echo $id; ?> {
+            display: block;
+            font-size: 3.5rem;
+            color: #d84315;
+            font-weight: 900;
+            margin-top: 10px;
+            text-shadow: 2px 2px 0px rgba(255, 255, 255, 0.5);
+        }
+
+        .close-btn-<?php echo $id; ?> {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 30px;
+            font-weight: bold;
+            color: #ff9800;
+            cursor: pointer;
+            background: none;
+            border: none;
+            transition: color 0.2s;
+        }
+
+        .close-btn-<?php echo $id; ?>:hover {
+            color: #d84315;
+        }
+
+        @keyframes popIn-<?php echo $id; ?> {
+            0% {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+    <div class="modal-overlay-<?php echo $id; ?>" id="modal-<?php echo $id; ?>">
+        <div class="modal-box-<?php echo $id; ?>">
+            <button class="close-btn-<?php echo $id; ?>"
+                onclick="document.getElementById('modal-<?php echo $id; ?>').style.display='none'">×</button>
+            <div style="font-size: 60px; margin-bottom: 10px;">🎉</div>
+            <h1 class="modal-title-<?php echo $id; ?>">Tahniah!</h1>
+            <div class="modal-message-<?php echo $id; ?>">
+                KLIEN ANDA LAYAK MENDAPAT DISKAUN SEBANYAK
+                <span class="highlight-amount-<?php echo $id; ?>"><?php echo esc_html($amount_text); ?></span>
+            </div>
+        </div>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+
+add_shortcode('promo_popup_24', function () {
+    return hpm_render_popup('RM48!!!!');
+});
+
+add_shortcode('promo_popup_12', function () {
+    return hpm_render_popup('RM24!!!!');
+});
