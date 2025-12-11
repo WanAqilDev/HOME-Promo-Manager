@@ -145,6 +145,12 @@ class Manager
                 $GLOBALS['wp_mail']($this->s('admin_email'), $subject, $msg);
             }
         }
+
+        // Set cookie for frontend popup
+        if (!headers_sent()) {
+            setcookie('hpm_promo_eligible', $code, time() + 3600, '/'); // Expires in 1 hour
+        }
+
         return true;
     }
 
@@ -204,6 +210,12 @@ class Manager
         DB::insert_entry($entry_id, $max);
 
         error_log('[HPM] Reactivation complete for entry ' . $entry_id);
+
+        // Set cookie for frontend popup
+        if (!headers_sent()) {
+            setcookie('hpm_promo_eligible', $code, time() + 3600, '/'); // Expires in 1 hour
+        }
+
         return true;
     }
 
