@@ -255,6 +255,13 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
                 text-align: center;
             }
 
+            @media (max-width: 640px) {
+                .flip-unit {
+                    width: 60px;
+                    height: 80px;
+                }
+            }
+
             .flip-digit {
                 background: #fff;
                 color:
@@ -269,6 +276,13 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
                 justify-content: center;
                 height: 100%;
                 width: 100%;
+            }
+
+            @media (max-width: 640px) {
+                .flip-digit {
+                    font-size: 2.5rem;
+                    border-radius: 10px;
+                }
             }
 
             .flip-anim {
@@ -307,6 +321,19 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
                 text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
                 width: 94px;
                 text-align: center;
+            }
+
+            @media (max-width: 640px) {
+                .flip-label {
+                    width: 60px;
+                    font-size: 0.7rem;
+                }
+                .flip-clock {
+                    gap: 0.5rem;
+                }
+                .labels-container {
+                    gap: 0.5rem;
+                }
             }
 
             /* --- LIVE STATS STYLES (Unchanged) --- */
@@ -487,7 +514,7 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
                 <div class="pill-discount">POTONGAN DISKAUN SEHINGGA 24%</div>
                 <p class="desc-text">Promosi terhad kepada <em style="color:#F80588;"><b>480 pendaftaran terawal
                             sahaja</b></em>.<br>Jangan lepaskan peluang anda ! </p>
-                <div id="flipClock" class="flip-clock"></div>
+                <div id="flipClock" class="flip-clock flex-wrap justify-center sm:flex-nowrap"></div>
                 <div class="labels-container"><span class="flip-label">Days</span><span
                         class="flip-label">Hours</span><span class="flip-label">Minutes</span><span
                         class="flip-label">Seconds</span></div>
@@ -505,7 +532,7 @@ $api_url = get_rest_url(null, 'promo/v1/counter');
                 <div class="text-tnc">*Terma & Syarat*</div>
             </div>
         </main>
-        <div class="footer-strip"><span class="footer-strip-txt">HOME Math Therapy &copy;
+        <div class="footer-strip"><span class="footer-strip-txt">Home Maths Therapy &copy;
                 <?= date('Y') ?>&nbsp;
                 &bull;
                 &nbsp;
