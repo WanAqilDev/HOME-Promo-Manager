@@ -171,6 +171,83 @@
 
 ---
 
+### ✅ **PHASE 8: REST API Updates - COMPLETED**
+
+**Files Modified:** `src/rest.php`
+
+#### Changes Made:
+
+1. **Updated Endpoint: `/wp-json/promo/v1/counter` (GET)**:
+   - Dual-mode response based on `code_assignment_mode`
+   - **Auto Mode Response** (Legacy):
+     ```json
+     {
+       "active": true,
+       "mode": "auto",
+       "current_code": "promo24",
+       "remaining_total": 120,
+       "remaining_tier": 50,
+       "end_time": 1736784000
+     }
+     ```
+   - **SMART26 Mode Response**:
+     ```json
+     {
+       "active": true,
+       "mode": "smart26",
+       "total_used": 45,
+       "total_max": 200,
+       "total_remaining": 155,
+       "codes": [
+         {
+           "code": "SMART26-LIVE1",
+           "description": "Live Session 1",
+           "used": 12,
+           "max": 50,
+           "remaining": 38,
+           "percentage": 24.0
+         }
+       ],
+       "categories": {
+         "new": 30,
+         "passive": 10,
+         "diagnostic": 3,
+         "lead": 2
+       },
+       "end_time": 1736784000
+     }
+     ```
+   - Per-code breakdown with usage stats
+   - Category breakdown (new/passive/diagnostic/lead)
+   - Total aggregated statistics
+   - Only includes active codes in response
+
+2. **New Endpoint: `/wp-json/promo/v1/validate` (POST)**:
+   - Real-time AJAX code validation
+   - Request format: `{ "code": "SMART26-LIVE1" }`
+   - Response format:
+     ```json
+     {
+       "valid": true,
+       "message": "Valid! 38 slots remaining.",
+       "remaining": 38
+     }
+     ```
+   - Input sanitization with `sanitize_text_field()`
+   - Validates: format, existence, active status, quota, promo period
+   - Returns user-friendly error messages
+
+#### API Features:
+- ✅ Backward compatible with legacy auto mode
+- ✅ Per-code statistics for frontend display
+- ✅ Category breakdown for analytics
+- ✅ Real-time validation for UX
+- ✅ Percentage calculations for progress bars
+- ✅ Timezone-aware timestamp conversion
+- ✅ Public endpoints (no authentication required)
+
+---
+
 ### ✅ **PHASE 5: Documentation Updates - COMPLETED**
 
 **Files Modified:**
@@ -179,24 +256,34 @@
 
 ---
 
-## 🔄 **REMAINING PHASES (Not Started)**
+## 🔄 **REMAINING PHASES**
 
 ### Phase 6: Validator Integration  
-**Status:** ⚠️ Partial - File exists but wrong spec
+**Status:** ⚠️ OPTIONAL - File exists but wrong spec
 **Files to Modify:** `src/Validator.php`
 - [ ] Refactor existing Validator to SMART26 spec
 - [ ] Implement `validate_code($code, $entry_id)` method
 - [ ] Implement `check_eligibility($entry_id)` - 4 categories
 - [ ] Integrate with Manager class
-**Note:** Current Manager implementation doesn't use Validator.php yet. Can be deferred if needed.
+**Note:** Manager.php already has validation logic. This can be deferred or skipped.
 
-### Phase 8: REST API Updates
+### Phase 9: Frontend Updates
 **Status:** ❌ Not Started
-**Files to Modify:** `src/rest.php`
-- [ ] Update `/counter` endpoint to return per-code stats
-- [ ] Add new `/validate` POST endpoint for AJAX validation
-- [ ] Return code-specific data structure
-- [ ] Support category breakdown in response
+**Files to Modify:** `template/promo-page.php` or Formidable form templates
+- [ ] Add code input field to registration form
+- [ ] Integrate AJAX validation with /validate endpoint
+- [ ] Real-time feedback UI (remaining slots, validation errors)
+- [ ] Update counter display to show per-code stats
+- [ ] Branch selection dropdown
+
+### Phase 10: Migration Script
+**Status:** ❌ Not Started - CRITICAL BEFORE LAUNCH
+**Files to Create:** `migrate-to-smart26.php` or admin action
+- [ ] Migrate existing entries from tier-based to code-specific
+- [ ] Assign codes based on existing promo_field values
+- [ ] Update database schema for existing entries
+- [ ] Dry-run mode for testing
+- [ ] Rollback capability
 
 ### Phase 8: REST API Updates
 **Status:** ❌ Not Started
@@ -251,33 +338,34 @@
 ## 🎯 **Next Steps (Recommended Order)**
 
 1. ✅ **Update Manager.php** (COMPLETED)
-   - Added validation methods
-   - Integrated with dynamic codes
-   
 2. ✅ **Update Formidable Hooks** (COMPLETED)
-   - Critical for user flow
-   - Added validation hooks
+3. ✅ **Update REST API** (COMPLETED)
 
-3. **Update REST API** (1-2 hours)
-   - Frontend depends on this
-   - Per-code stats endpoint
+4. **Frontend Updates** (2-3 hours) - OPTIONAL
+   - Code input field already in form (field 3170)
+   - Can add AJAX validation for better UX
+   - Counter display updates
 
-4. **Refactor Validator.php** (OPTIONAL - 2-3 hours)
-   - Not currently used by core flow
-   - Can be deferred post-launch
+5. **Create Migration Script** (2-3 hours) - CRITICAL
+   - Must run before Jan 12, 2026 launch
+   - Migrate existing tier-based data to code-specific
 
-5. **Frontend Updates** (2-3 hours)
-   - Code input field validation
-   - Real-time feedback
+6. **Testing** (4-6 hours) - CRITICAL
+   - Test all registration flows
+   - Verify code validation
+   - Check category detection
+   - Confirm reactivation logic
 
-6. **Create Migration Script** (2-3 hours)
-   - Must run before campaign launch
+**Estimated Remaining Time: 6-12 hours** (Core SMART26 system complete!)
 
-7. **Testing** (4-6 hours)
-   - All flows
-   - Edge cases
-
-**Estimated Remaining Time: 9-17 hours** (Phases 4 & 7 completed)
+**System Status:** 🟢 **Core functionality ready for testing**
+- ✅ Database schema updated
+- ✅ Admin UI with dynamic code management
+- ✅ Manager validation methods
+- ✅ Formidable hooks integrated
+- ✅ REST API endpoints active
+- ⚠️ Migration script needed
+- ⚠️ Testing required
 
 ---
 
