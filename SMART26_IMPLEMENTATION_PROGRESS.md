@@ -124,6 +124,53 @@
 
 ---
 
+### ✅ **PHASE 7: Formidable Hooks Integration - COMPLETED**
+
+**Files Modified:** `src/hooks.php`
+
+#### Changes Made:
+1. **New Hook: `frm_validate_entry` (Pre-Submission Validation)**:
+   - Real-time code validation before form submission
+   - Only validates when mode = 'manual' (SMART26)
+   - Checks if user wants to register (Daftar = Ya)
+   - Validates promo code using `Manager::validate_code()`
+   - Adds field-specific error messages if validation fails
+   - Prevents form submission with invalid codes
+
+2. **Updated Hook: `frm_after_create_entry` (SMART26 Registration)**:
+   - Dual-mode support: auto-assign vs SMART26
+   - Auto mode: Uses legacy `record_activation()` method
+   - Manual mode: Uses new `validate_and_record()` with full validation
+   - Category detection logic:
+     - `diagnostic`: Recent diagnostic date within 90 days
+     - `lead`: Lead status field = 'Lead'
+     - `new`: Default for first-time registrations
+     - `passive`: Handled by reactivation flow
+   - Branch field capture from form submission
+   - Comprehensive debug logging
+
+3. **Updated Hook: Reactivation Detection (frm_after_update_entry)**:
+   - Passes user-entered code to `record_reactivation()` in SMART26 mode
+   - Retrieves code from promo field for validation
+   - Auto mode: Uses tier-based code assignment
+   - Manual mode: Validates user code before reactivation
+   - Maintains 90-day threshold and partial registration edge case
+
+4. **Category Auto-Detection**:
+   - Checks `diagnostic_date_field_id` for diagnostic category (< 90 days)
+   - Checks `lead_status_field_id` for lead category
+   - Falls back to 'new' category if no special conditions
+   - Timezone-aware date calculations
+
+#### Integration Points:
+- Form validation blocks submission if code invalid
+- New registrations automatically categorized and tracked
+- Reactivations require valid codes in SMART26 mode
+- Branch selection captured and stored with registration
+- All flows respect code_assignment_mode setting
+
+---
+
 ### ✅ **PHASE 5: Documentation Updates - COMPLETED**
 
 **Files Modified:**
@@ -141,14 +188,15 @@
 - [ ] Implement `validate_code($code, $entry_id)` method
 - [ ] Implement `check_eligibility($entry_id)` - 4 categories
 - [ ] Integrate with Manager class
+**Note:** Current Manager implementation doesn't use Validator.php yet. Can be deferred if needed.
 
-### Phase 7: Formidable Hooks
+### Phase 8: REST API Updates
 **Status:** ❌ Not Started
-**Files to Modify:** `src/hooks.php`
-- [ ] Add `frm_validate_entry` hook for pre-submission validation
-- [ ] Update `frm_after_create_entry` for code validation flow
-- [ ] Update reactivation hooks for user-entered codes
-- [ ] Add branch field capture logic
+**Files to Modify:** `src/rest.php`
+- [ ] Update `/counter` endpoint to return per-code stats
+- [ ] Add new `/validate` POST endpoint for AJAX validation
+- [ ] Return code-specific data structure
+- [ ] Support category breakdown in response
 
 ### Phase 8: REST API Updates
 **Status:** ❌ Not Started
@@ -206,25 +254,30 @@
    - Added validation methods
    - Integrated with dynamic codes
    
-2. **Refactor Validator.php** (2-3 hours)
-   - Align with SMART26 requirements
-   - Implement 4-category eligibility
-
-3. **Update Formidable Hooks** (3-4 hours)
+2. ✅ **Update Formidable Hooks** (COMPLETED)
    - Critical for user flow
-   - Add validation hooks
+   - Added validation hooks
 
-4. **Update REST API** (1-2 hours)
+3. **Update REST API** (1-2 hours)
    - Frontend depends on this
+   - Per-code stats endpoint
 
-5. **Create Migration Script** (2-3 hours)
+4. **Refactor Validator.php** (OPTIONAL - 2-3 hours)
+   - Not currently used by core flow
+   - Can be deferred post-launch
+
+5. **Frontend Updates** (2-3 hours)
+   - Code input field validation
+   - Real-time feedback
+
+6. **Create Migration Script** (2-3 hours)
    - Must run before campaign launch
 
-6. **Testing** (4-6 hours)
+7. **Testing** (4-6 hours)
    - All flows
    - Edge cases
 
-**Estimated Remaining Time: 12-18 hours** (Phase 4 completed)
+**Estimated Remaining Time: 9-17 hours** (Phases 4 & 7 completed)
 
 ---
 

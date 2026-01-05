@@ -8,6 +8,68 @@ if (!defined('ABSPATH'))
 
 require_once __DIR__ . '/utils.php';
 
+// VALIDATION: Pre-submission validation for SMART26 promo codes
+add_filter('frm_validate_entry', function ($errors, $values) {
+    $mgr = Manager::get_instance();
+    $form_id = !empty($values['form_id']) ? (int) $values['form_id'] : 0;
+    
+    if ($form_id !== (int) $mgr->s('form_id')) {
+        return $errors;
+    }
+
+    // Only validate if promo is active
+    if (!$mgr->is_active()) {
+        return $errors;
+    }
+
+    // Only validate in manual (SMART26) mode
+    $mode = $mgr->s('code_assignment_mode') ?: 'manual';
+    if ($mode !== 'manual') {
+        return $errors; // Skip validation in auto mode
+    }
+
+    // Check if user wants to register (Daftar = Ya)
+    $daftar_field = (string) $mgr->s('daftar_field_id');
+    $trigger_val = $mgr->s('daftar_trigger_value') ?: 'Ya';
+    $daftar_val = !empty($values['item_meta'][$daftar_field]) ? $values['item_meta'][$daftar_field] : '';
+
+    if ($daftar_val !== $trigger_val) {
+        return $errors; // Not registering, skip validation
+    }
+
+    // Get promo code from submission
+    $promo_field = (string) $mgr->s('promo_field_id');
+    $code = !empty($values['item_meta'][$promo_field]) ? trim($values['item_meta'][$promo_field]) : '';
+
+    if ($mgr->s('debug_mode')) {
+        error_log(sprintf(
+            '[HPM-VALIDATE] Form submission - Code: %s, Daftar: %s',
+            $code, $daftar_val
+        ));
+    }
+
+    // Validate the code
+    $validation = $mgr->validate_code($code);
+    
+    if (!$validation['valid']) {
+        // Add error to the promo field
+        if (!isset($errors['field' . $promo_field])) {
+            $errors['field' . $promo_field] = '';
+        }
+        $errors['field' . $promo_field] = $validation['message'];
+        
+        if ($mgr->s('debug_mode')) {
+            error_log('[HPM-VALIDATE] Validation failed: ' . $validation['message']);
+        }
+    } else {
+        if ($mgr->s('debug_mode')) {
+            error_log('[HPM-VALIDATE] Code validated: ' . $validation['message']);
+        }
+    }
+
+    return $errors;
+}, 10, 2);
+
 // NEW REGISTRATION: Handle new entries when form is submitted
 add_action('frm_after_create_entry', function ($entry_id, $form_id) {
     $mgr = Manager::get_instance();
@@ -15,12 +77,85 @@ add_action('frm_after_create_entry', function ($entry_id, $form_id) {
         return;
     if (!$mgr->is_active())
         return;
+    
     $daftar_field = (int) $mgr->s('daftar_field_id');
     $trigger_val = $mgr->s('daftar_trigger_value') ?: 'Ya';
-
     $daftar_val = ff_get_entry_meta($entry_id, $daftar_field);
-    if ($daftar_val === $trigger_val) {
+    
+    if ($daftar_val !== $trigger_val) {
+        return; // Not registering for promo
+    }
+
+    // Get code assignment mode
+    $mode = $mgr->s('code_assignment_mode') ?: 'manual';
+    
+    if ($mode === 'auto') {
+        // Legacy auto-assign mode
         $mgr->record_activation($entry_id);
+        if ($mgr->s('debug_mode')) {
+            error_log('[HPM-CREATE] Auto mode - activation recorded for entry ' . $entry_id);
+        }
+    } else {
+        // SMART26 manual mode with code validation
+        $promo_field = (int) $mgr->s('promo_field_id');
+        $code = ff_get_field_value_robust($entry_id, $promo_field);
+        
+        // Get branch selection
+        $branch_field = (int) $mgr->s('branch_field_id');
+        $branch = $branch_field ? ff_get_field_value_robust($entry_id, $branch_field) : '';
+        
+        // Determine category based on entry data
+        $category = 'new'; // Default to new registration
+        
+        // Check if diagnostic (has recent diagnostic date)
+        $diagnostic_field = (int) $mgr->s('diagnostic_date_field_id');
+        if ($diagnostic_field) {
+            $diagnostic_date = ff_get_field_value_robust($entry_id, $diagnostic_field);
+            if (!empty($diagnostic_date)) {
+                // Check if within 90 days
+                try {
+                    $tz = new \DateTimeZone($mgr->s('timezone') ?: 'Asia/Kuala_Lumpur');
+                    $diag_dt = new \DateTime($diagnostic_date, $tz);
+                    $now = new \DateTime('now', $tz);
+                    $days_since = ($now->getTimestamp() - $diag_dt->getTimestamp()) / 86400;
+                    if ($days_since <= 90) {
+                        $category = 'diagnostic';
+                    }
+                } catch (\Exception $e) {
+                    // Ignore date parsing errors
+                }
+            }
+        }
+        
+        // Check if lead
+        $lead_field = (int) $mgr->s('lead_status_field_id');
+        if ($lead_field && $category === 'new') { // Only check if not already categorized
+            $lead_status = ff_get_field_value_robust($entry_id, $lead_field);
+            if ($lead_status === 'Lead' || $lead_status === 'lead') {
+                $category = 'lead';
+            }
+        }
+        
+        if ($mgr->s('debug_mode')) {
+            error_log(sprintf(
+                '[HPM-CREATE] SMART26 mode - Entry: %d, Code: %s, Branch: %s, Category: %s',
+                $entry_id, $code, $branch, $category
+            ));
+        }
+        
+        // Validate and record with SMART26 system
+        $result = $mgr->validate_and_record($code, $entry_id, $branch, $category);
+        
+        if ($result['success']) {
+            if ($mgr->s('debug_mode')) {
+                error_log('[HPM-CREATE] SMART26 registration successful: ' . $result['message']);
+            }
+        } else {
+            if ($mgr->s('debug_mode')) {
+                error_log('[HPM-CREATE] SMART26 registration failed: ' . $result['message']);
+            }
+            // Error already logged, validation should have caught this
+        }
     }
 }, 10, 2);
 
@@ -227,8 +362,23 @@ add_action('frm_after_update_entry', function ($entry_id, $form_id) {
         if ($days_inactive > 90 || $is_partial) {
             if ($mgr->s('debug_mode'))
                 error_log('[HPM-DEBUG] QUALIFIED! Triggering reactivation.');
-            // Process reactivation
-            $mgr->record_reactivation($entry_id, $old_status, $new_status, $old_pasif);
+            
+            // Get promo code for SMART26 mode
+            $user_code = '';
+            $mode = $mgr->s('code_assignment_mode') ?: 'manual';
+            
+            if ($mode === 'manual') {
+                // In SMART26 mode, get the code from the entry
+                $promo_field = (int) $mgr->s('promo_field_id');
+                $user_code = ff_get_field_value_robust($entry_id, $promo_field);
+                
+                if ($mgr->s('debug_mode')) {
+                    error_log(sprintf('[HPM-DEBUG] SMART26 reactivation with code: %s', $user_code));
+                }
+            }
+            
+            // Process reactivation (pass user code for SMART26 validation)
+            $mgr->record_reactivation($entry_id, $old_status, $new_status, $old_pasif, $user_code);
         } else {
             if ($mgr->s('debug_mode'))
                 error_log('[HPM-DEBUG] Not qualified (<= 90 days and not partial).');
