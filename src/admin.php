@@ -60,6 +60,12 @@ function sanitize_settings($input)
     $out['branch_field_id'] = isset($input['branch_field_id']) ? absint($input['branch_field_id']) : absint($defaults['branch_field_id'] ?? 0);
     $out['passive_threshold_days'] = isset($input['passive_threshold_days']) ? absint($input['passive_threshold_days']) : absint($defaults['passive_threshold_days'] ?? 90);
 
+    // SMART26: Code assignment mode
+    $out['code_assignment_mode'] = sanitize_text_field($input['code_assignment_mode'] ?? ($defaults['code_assignment_mode'] ?? 'manual'));
+    if (!in_array($out['code_assignment_mode'], ['auto', 'manual'])) {
+        $out['code_assignment_mode'] = 'manual'; // Default to manual if invalid
+    }
+
     // SMART26: Dynamic promo codes (new system)
     if (isset($input['promo_codes']) && is_array($input['promo_codes'])) {
         $out['promo_codes'] = [];
@@ -300,6 +306,64 @@ function render_admin_page()
                     <p>Auto-create page with template</p>
                 <?php endif; ?>
             </div>
+        </div>
+
+        <!-- SMART26: Code Assignment Mode Toggle -->
+        <div class="hpm-mode-toggle" style="background: #fff; border: 1px solid #ccd0d4; padding: 20px; margin-bottom: 20px; border-radius: 4px;">
+            <h2 style="margin-top: 0;">Code Assignment Mode</h2>
+            
+            <?php $current_mode = $opts['code_assignment_mode'] ?? 'manual'; ?>
+            
+            <div style="background: <?php echo $current_mode === 'manual' ? '#e7f5fe' : '#fff4e5'; ?>; border-left: 4px solid <?php echo $current_mode === 'manual' ? '#2271b1' : '#dba617'; ?>; padding: 15px; margin-bottom: 15px;">
+                <strong>Current Mode: <?php echo $current_mode === 'auto' ? 'Auto-Assign (Legacy)' : 'User-Entered Codes (SMART26)'; ?></strong>
+                <p style="margin: 10px 0 0 0;">
+                    <?php if ($current_mode === 'auto'): ?>
+                        Codes are automatically assigned based on tier thresholds. Users do not enter codes manually.
+                    <?php else: ?>
+                        Users must enter valid promo codes during registration. Codes are validated against the list below.
+                    <?php endif; ?>
+                </p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="border: 2px solid <?php echo $current_mode === 'auto' ? '#2271b1' : '#ddd'; ?>; padding: 15px; border-radius: 8px; background: <?php echo $current_mode === 'auto' ? '#f0f6fc' : '#fff'; ?>;">
+                    <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                        <span class="dashicons dashicons-<?php echo $current_mode === 'auto' ? 'yes-alt' : 'marker'; ?>" style="color: <?php echo $current_mode === 'auto' ? '#2271b1' : '#999'; ?>;"></span>
+                        Auto-Assign (Legacy)
+                    </h3>
+                    <ul style="margin: 10px 0; padding-left: 20px; color: #666;">
+                        <li>Automatic tier-based assignment</li>
+                        <li>Uses tier1_max threshold</li>
+                        <li>Code: promo24 → promo12</li>
+                        <li>No user input required</li>
+                    </ul>
+                    <?php if ($current_mode !== 'auto'): ?>
+                        <button type="button" onclick="document.getElementById('mode_auto').checked=true; this.closest('form').querySelector('[name=\"home_promo_manager_settings[code_assignment_mode]\"]').value='auto'; alert('Mode changed to Auto-Assign. Click Save Changes below.');" class="button">Switch to Auto</button>
+                    <?php else: ?>
+                        <strong style="color: #2271b1;">✓ Active</strong>
+                    <?php endif; ?>
+                </div>
+
+                <div style="border: 2px solid <?php echo $current_mode === 'manual' ? '#2271b1' : '#ddd'; ?>; padding: 15px; border-radius: 8px; background: <?php echo $current_mode === 'manual' ? '#f0f6fc' : '#fff'; ?>;">
+                    <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                        <span class="dashicons dashicons-<?php echo $current_mode === 'manual' ? 'yes-alt' : 'marker'; ?>" style="color: <?php echo $current_mode === 'manual' ? '#2271b1' : '#999'; ?>;"></span>
+                        User-Entered Codes (SMART26)
+                    </h3>
+                    <ul style="margin: 10px 0; padding-left: 20px; color: #666;">
+                        <li>Users enter promo codes manually</li>
+                        <li>Per-code quota tracking</li>
+                        <li>Dynamic code management</li>
+                        <li>4-category eligibility validation</li>
+                    </ul>
+                    <?php if ($current_mode !== 'manual'): ?>
+                        <button type="button" onclick="document.getElementById('mode_manual').checked=true; this.closest('form').querySelector('[name=\"home_promo_manager_settings[code_assignment_mode]\"]').value='manual'; alert('Mode changed to SMART26. Click Save Changes below.');" class="button">Switch to SMART26</button>
+                    <?php else: ?>
+                        <strong style="color: #2271b1;">✓ Active</strong>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <input type="hidden" name="home_promo_manager_settings[code_assignment_mode]" value="<?php echo esc_attr($current_mode); ?>" />
         </div>
 
         <!-- SMART26: Dynamic Code Management Section -->

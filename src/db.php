@@ -77,6 +77,7 @@ class DB
                 'lead_status_field_id' => 0,
                 'branch_field_id' => 0,
                 'passive_threshold_days' => 90,
+                'code_assignment_mode' => 'manual',  // 'auto' or 'manual'
                 'promo_codes' => [
                     'SMART26-LIVE1' => ['max' => 50, 'description' => 'Live Session 1', 'active' => true],
                     'SMART26-LIVE2' => ['max' => 50, 'description' => 'Live Session 2', 'active' => true],

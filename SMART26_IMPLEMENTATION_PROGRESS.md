@@ -61,7 +61,13 @@
 **Files Modified:** `src/admin.php`
 
 #### Features Implemented:
-1. **Real-time Code Statistics Table**:
+1. **Code Assignment Mode Toggle**:
+   - Switch between "Auto-Assign (Legacy)" and "User-Entered Codes (SMART26)"
+   - Visual comparison of both modes
+   - Prevents conflicts between old and new systems
+   - Defaults to 'manual' (SMART26 mode)
+
+2. **Real-time Code Statistics Table**:
    - Shows code name, description, used/max, remaining, progress bar
    - Color-coded progress bars (green < 80%, yellow 80-99%, red 100%)
    - Active/archived status indicators
