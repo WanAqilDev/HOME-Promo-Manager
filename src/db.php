@@ -28,13 +28,19 @@ class DB
         $reactivation_table = self::reactivation_table_name();
         $charset = $wpdb->get_charset_collate();
 
-        // Main counted entries table
+        // Main counted entries table (SMART26 schema)
         $sql = "CREATE TABLE IF NOT EXISTS {$table} (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             entry_id BIGINT(20) UNSIGNED NOT NULL,
+            promo_code VARCHAR(50) DEFAULT '',
+            branch VARCHAR(100) DEFAULT '',
+            user_category VARCHAR(50) DEFAULT '',
+            eligibility_verified TINYINT(1) DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY uq_entry (entry_id)
+            UNIQUE KEY uq_entry (entry_id),
+            KEY idx_code (promo_code),
+            KEY idx_category (user_category)
         ) $charset;";
 
         // Reactivation tracking table
@@ -58,16 +64,31 @@ class DB
         // ensure default settings option exists
         if (get_option('home_promo_manager_settings') === false) {
             add_option('home_promo_manager_settings', [
-                'start' => '2025-12-01 12:00:00',
-                'end' => '2025-12-24 23:59:00',
+                'start' => '2026-01-12 12:00:00',
+                'end' => '2026-01-14 11:59:00',
+                'timezone' => 'Asia/Kuala_Lumpur',
                 'form_id' => 13,
                 'promo_field_id' => 3170,
                 'daftar_field_id' => 196,
-                'max' => 480,
-                'tier1_max' => 240,
-                'code_tier1' => 'promo24',
-                'code_tier2' => 'promo12',
+                'daftar_trigger_value' => 'Ya',
+                'status_field_id' => 199,
+                'pasif_date_field_id' => 1698,
+                'diagnostic_date_field_id' => 0,
+                'lead_status_field_id' => 0,
+                'branch_field_id' => 0,
+                'passive_threshold_days' => 90,
+                'promo_codes' => [
+                    'SMART26-LIVE1' => ['max' => 50, 'description' => 'Live Session 1', 'active' => true],
+                    'SMART26-LIVE2' => ['max' => 50, 'description' => 'Live Session 2', 'active' => true],
+                    'SMART26-LIVE3' => ['max' => 50, 'description' => 'Live Session 3', 'active' => true],
+                    'SMART26-LIVE4' => ['max' => 50, 'description' => 'Live Session 4', 'active' => true],
+                ],
+                'total_max' => 200,
+                'base_price' => 200.00,
+                'discount_amount' => 52.00,
+                'final_price' => 148.00,
                 'admin_email' => get_option('admin_email'),
+                'debug_mode' => false,
             ]);
         }
     }
@@ -155,6 +176,141 @@ class DB
         }
         // return true if inserted (rows_affected > 0)
         return ($wpdb->rows_affected > 0);
+    }
+
+    /**
+     * SMART26: Insert entry with code tracking
+     * 
+     * @param int $entry_id Formidable entry ID
+     * @param string $code Promo code used
+     * @param string $branch Branch selection
+     * @param string $category User category (new/passive/diagnostic/lead)
+     * @param int|null $limit Per-code quota limit
+     * @return bool True if inserted successfully
+     */
+    public static function insert_entry_with_code($entry_id, $code, $branch = '', $category = '', $limit = null)
+    {
+        global $wpdb;
+        $table = self::table_name();
+        $entry_id = (int) $entry_id;
+
+        // Check code-specific quota if limit provided
+        if ($limit !== null) {
+            $limit = (int) $limit;
+            $current_usage = self::get_code_usage($code);
+            
+            if ($current_usage >= $limit) {
+                error_log('[HPM] Code quota exceeded: ' . $code . ' (' . $current_usage . '/' . $limit . ')');
+                return false;
+            }
+        }
+
+        // Insert with code tracking
+        $res = $wpdb->insert(
+            $table,
+            [
+                'entry_id' => $entry_id,
+                'promo_code' => sanitize_text_field($code),
+                'branch' => sanitize_text_field($branch),
+                'user_category' => sanitize_text_field($category),
+                'eligibility_verified' => 1,
+            ],
+            ['%d', '%s', '%s', '%s', '%d']
+        );
+
+        if ($res === false) {
+            error_log('[HPM] Failed to insert entry with code: ' . $wpdb->last_error);
+            return false;
+        }
+
+        return ($wpdb->insert_id > 0);
+    }
+
+    /**
+     * SMART26: Get usage count for a specific promo code
+     * 
+     * @param string $code Promo code
+     * @return int Usage count
+     */
+    public static function get_code_usage($code)
+    {
+        global $wpdb;
+        $table = self::table_name();
+        
+        $count = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE promo_code = %s",
+            $code
+        ));
+
+        return (int) $count;
+    }
+
+    /**
+     * SMART26: Get usage breakdown by code
+     * 
+     * @return array Array of ['promo_code' => ..., 'count' => ...]
+     */
+    public static function get_code_stats()
+    {
+        global $wpdb;
+        $table = self::table_name();
+        
+        $results = $wpdb->get_results(
+            "SELECT promo_code, COUNT(*) as count 
+             FROM {$table} 
+             WHERE promo_code != ''
+             GROUP BY promo_code
+             ORDER BY count DESC",
+            ARRAY_A
+        );
+
+        return $results ?: [];
+    }
+
+    /**
+     * SMART26: Get category breakdown
+     * 
+     * @return array Array of ['user_category' => ..., 'count' => ...]
+     */
+    public static function get_category_stats()
+    {
+        global $wpdb;
+        $table = self::table_name();
+        
+        $results = $wpdb->get_results(
+            "SELECT user_category, COUNT(*) as count 
+             FROM {$table} 
+             WHERE user_category != ''
+             GROUP BY user_category
+             ORDER BY count DESC",
+            ARRAY_A
+        );
+
+        return $results ?: [];
+    }
+
+    /**
+     * SMART26: Get detailed entries for a specific code
+     * 
+     * @param string $code Promo code
+     * @param int $limit Number of results
+     * @return array Entry details
+     */
+    public static function get_code_entries($code, $limit = 100)
+    {
+        global $wpdb;
+        $table = self::table_name();
+        
+        $results = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$table} 
+             WHERE promo_code = %s 
+             ORDER BY created_at DESC 
+             LIMIT %d",
+            $code,
+            $limit
+        ), ARRAY_A);
+
+        return $results ?: [];
     }
 
     public static function count_entries()

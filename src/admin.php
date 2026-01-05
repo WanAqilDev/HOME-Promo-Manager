@@ -30,7 +30,7 @@ add_action('admin_init', function () {
 });
 
 /**
- * Sanitize incoming settings array
+ * Sanitize incoming settings array (SMART26 compatible)
  *
  * @param array $input
  * @return array sanitized
@@ -40,22 +40,66 @@ function sanitize_settings($input)
     $defaults = get_option('home_promo_manager_settings', []);
     $out = [];
 
-    $out['start'] = sanitize_text_field($input['start'] ?? ($defaults['start'] ?? '2025-12-01 12:00:00'));
-    $out['end'] = sanitize_text_field($input['end'] ?? ($defaults['end'] ?? '2025-12-24 23:59:00'));
+    // Campaign timing
+    $out['start'] = sanitize_text_field($input['start'] ?? ($defaults['start'] ?? '2026-01-12 12:00:00'));
+    $out['end'] = sanitize_text_field($input['end'] ?? ($defaults['end'] ?? '2026-01-14 11:59:00'));
     $out['timezone'] = sanitize_text_field($input['timezone'] ?? ($defaults['timezone'] ?? 'Asia/Kuala_Lumpur'));
     $out['debug_mode'] = isset($input['debug_mode']) ? (bool) $input['debug_mode'] : false;
 
+    // Form field IDs
     $out['form_id'] = isset($input['form_id']) ? absint($input['form_id']) : absint($defaults['form_id'] ?? 13);
     $out['promo_field_id'] = isset($input['promo_field_id']) ? absint($input['promo_field_id']) : absint($defaults['promo_field_id'] ?? 3170);
     $out['daftar_field_id'] = isset($input['daftar_field_id']) ? absint($input['daftar_field_id']) : absint($defaults['daftar_field_id'] ?? 196);
     $out['daftar_trigger_value'] = sanitize_text_field($input['daftar_trigger_value'] ?? ($defaults['daftar_trigger_value'] ?? 'Ya'));
-
-    $out['status_field_id'] = isset($input['status_field_id']) ? absint($input['status_field_id']) : absint($defaults['status_field_id'] ?? 209);
+    $out['status_field_id'] = isset($input['status_field_id']) ? absint($input['status_field_id']) : absint($defaults['status_field_id'] ?? 199);
     $out['pasif_date_field_id'] = isset($input['pasif_date_field_id']) ? absint($input['pasif_date_field_id']) : absint($defaults['pasif_date_field_id'] ?? 1698);
+    
+    // SMART26: New eligibility fields
+    $out['diagnostic_date_field_id'] = isset($input['diagnostic_date_field_id']) ? absint($input['diagnostic_date_field_id']) : absint($defaults['diagnostic_date_field_id'] ?? 0);
+    $out['lead_status_field_id'] = isset($input['lead_status_field_id']) ? absint($input['lead_status_field_id']) : absint($defaults['lead_status_field_id'] ?? 0);
+    $out['branch_field_id'] = isset($input['branch_field_id']) ? absint($input['branch_field_id']) : absint($defaults['branch_field_id'] ?? 0);
+    $out['passive_threshold_days'] = isset($input['passive_threshold_days']) ? absint($input['passive_threshold_days']) : absint($defaults['passive_threshold_days'] ?? 90);
 
+    // SMART26: Dynamic promo codes (new system)
+    if (isset($input['promo_codes']) && is_array($input['promo_codes'])) {
+        $out['promo_codes'] = [];
+        foreach ($input['promo_codes'] as $code => $config) {
+            $sanitized_code = sanitize_text_field($code);
+            if (!empty($sanitized_code)) {
+                $out['promo_codes'][$sanitized_code] = [
+                    'max' => isset($config['max']) ? absint($config['max']) : 50,
+                    'description' => sanitize_text_field($config['description'] ?? ''),
+                    'active' => isset($config['active']) ? (bool) $config['active'] : true,
+                ];
+            }
+        }
+    } else {
+        // Keep existing codes if not updated
+        $out['promo_codes'] = $defaults['promo_codes'] ?? [
+            'SMART26-LIVE1' => ['max' => 50, 'description' => 'Live Session 1', 'active' => true],
+            'SMART26-LIVE2' => ['max' => 50, 'description' => 'Live Session 2', 'active' => true],
+            'SMART26-LIVE3' => ['max' => 50, 'description' => 'Live Session 3', 'active' => true],
+            'SMART26-LIVE4' => ['max' => 50, 'description' => 'Live Session 4', 'active' => true],
+        ];
+    }
+
+    // SMART26: Pricing
+    $out['base_price'] = isset($input['base_price']) ? floatval($input['base_price']) : floatval($defaults['base_price'] ?? 200.00);
+    $out['discount_amount'] = isset($input['discount_amount']) ? floatval($input['discount_amount']) : floatval($defaults['discount_amount'] ?? 52.00);
+    $out['final_price'] = isset($input['final_price']) ? floatval($input['final_price']) : floatval($defaults['final_price'] ?? 148.00);
+    
+    // Calculate total max from all active codes
+    $total_max = 0;
+    foreach ($out['promo_codes'] as $config) {
+        if ($config['active']) {
+            $total_max += $config['max'];
+        }
+    }
+    $out['total_max'] = $total_max;
+
+    // Legacy fields (backward compatibility - keep but mark as deprecated)
     $out['max'] = isset($input['max']) ? absint($input['max']) : absint($defaults['max'] ?? 480);
     $out['tier1_max'] = isset($input['tier1_max']) ? absint($input['tier1_max']) : absint($defaults['tier1_max'] ?? 240);
-
     $out['code_tier1'] = sanitize_text_field($input['code_tier1'] ?? ($defaults['code_tier1'] ?? 'promo24'));
     $out['code_tier2'] = sanitize_text_field($input['code_tier2'] ?? ($defaults['code_tier2'] ?? 'promo12'));
 
@@ -256,13 +300,108 @@ function render_admin_page()
                     <p>Auto-create page with template</p>
                 <?php endif; ?>
             </div>
+        </div>
 
-            <form method="post" action="options.php">
-                <?php settings_fields('hpm_settings_group');
-                do_settings_sections('hpm_settings_group'); ?>
-                <table class="form-table" role="presentation">
-                    <tbody>
-                        <tr>
+        <!-- SMART26: Dynamic Code Management Section -->
+        <div class="hpm-code-management" style="background: #fff; border: 1px solid #ccd0d4; padding: 20px; margin-bottom: 20px; border-radius: 4px;">
+            <h2 style="margin-top: 0;">Promo Codes Management (SMART26)</h2>
+            
+            <?php
+            $code_stats = DB::get_code_stats();
+            $code_usage_map = [];
+            foreach ($code_stats as $stat) {
+                $code_usage_map[$stat['promo_code']] = (int) $stat['count'];
+            }
+            
+            $promo_codes = $opts['promo_codes'] ?? [];
+            ?>
+            
+            <table class="wp-list-table widefat fixed striped" style="margin-bottom: 20px;">
+                <thead>
+                    <tr>
+                        <th style="width: 200px;">Code</th>
+                        <th>Description</th>
+                        <th style="width: 80px;">Used</th>
+                        <th style="width: 80px;">Max</th>
+                        <th style="width: 100px;">Remaining</th>
+                        <th style="width: 200px;">Progress</th>
+                        <th style="width: 100px;">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="hpm-codes-list">
+                    <?php foreach ($promo_codes as $code => $config): 
+                        $usage = $code_usage_map[$code] ?? 0;
+                        $max = $config['max'];
+                        $remaining = max(0, $max - $usage);
+                        $percent = $max > 0 ? ($usage / $max) * 100 : 0;
+                        $active = $config['active'] ?? true;
+                        
+                        if ($percent >= 100) {
+                            $bar_color = '#d63638';
+                        } elseif ($percent >= 80) {
+                            $bar_color = '#dba617';
+                        } else {
+                            $bar_color = '#00a32a';
+                        }
+                    ?>
+                    <tr data-code="<?php echo esc_attr($code); ?>">
+                        <td><strong><?php echo esc_html($code); ?></strong></td>
+                        <td><?php echo esc_html($config['description'] ?? ''); ?></td>
+                        <td><?php echo $usage; ?></td>
+                        <td><?php echo $max; ?></td>
+                        <td><strong><?php echo $remaining; ?></strong></td>
+                        <td>
+                            <div style="background: #f0f0f1; height: 24px; border-radius: 12px; overflow: hidden;">
+                                <div style="background: <?php echo $bar_color; ?>; height: 100%; width: <?php echo $percent; ?>%; transition: width 0.3s;"></div>
+                            </div>
+                            <small><?php echo number_format($percent, 1); ?>%</small>
+                        </td>
+                        <td>
+                            <span class="dashicons dashicons-<?php echo $active ? 'yes-alt' : 'archive'; ?>" style="color: <?php echo $active ? '#00a32a' : '#dba617'; ?>;"></span>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+
+            <div style="background: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 4px;">
+                <h3 style="margin-top: 0;">Add/Edit Promo Code</h3>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <label for="hpm_new_code_name" style="display: block; font-weight: 600; margin-bottom: 5px;">Code Name</label>
+                        <input type="text" id="hpm_new_code_name" placeholder="SMART26-LIVE5" style="width: 100%;" />
+                    </div>
+                    <div>
+                        <label for="hpm_new_code_desc" style="display: block; font-weight: 600; margin-bottom: 5px;">Description</label>
+                        <input type="text" id="hpm_new_code_desc" placeholder="Live Session 5" style="width: 100%;" />
+                    </div>
+                    <div>
+                        <label for="hpm_new_code_max" style="display: block; font-weight: 600; margin-bottom: 5px;">Max Quota</label>
+                        <input type="number" id="hpm_new_code_max" value="50" min="1" style="width: 100%;" />
+                    </div>
+                </div>
+
+                <button type="button" id="hpm-add-code-btn" class="button button-primary">
+                    <span class="dashicons dashicons-plus-alt" style="margin-top: 3px;"></span> Add Code (Save below to persist)
+                </button>
+            </div>
+        </div>
+
+        <form method="post" action="options.php">
+            <?php settings_fields('hpm_settings_group');
+            do_settings_sections('hpm_settings_group'); ?>
+            
+            <!-- Dynamic codes as hidden fields -->
+            <?php foreach ($promo_codes as $code => $config): ?>
+                <input type="hidden" name="home_promo_manager_settings[promo_codes][<?php echo esc_attr($code); ?>][max]" value="<?php echo esc_attr($config['max']); ?>" />
+                <input type="hidden" name="home_promo_manager_settings[promo_codes][<?php echo esc_attr($code); ?>][description]" value="<?php echo esc_attr($config['description'] ?? ''); ?>" />
+                <input type="hidden" name="home_promo_manager_settings[promo_codes][<?php echo esc_attr($code); ?>][active]" value="<?php echo $config['active'] ? '1' : '0'; ?>" />
+            <?php endforeach; ?>
+
+            <table class="form-table" role="presentation">
+                <tbody>
+                    <tr>
                             <th scope="row"><label for="hpm_start">Promo START (Asia/Kuala_Lumpur)</label></th>
                             <td>
                                 <input name="home_promo_manager_settings[start]" type="text" id="hpm_start"
