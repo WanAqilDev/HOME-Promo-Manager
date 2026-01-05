@@ -89,7 +89,42 @@
 
 ---
 
-### ✅ **PHASE 4: Documentation Updates - COMPLETED**
+### ✅ **PHASE 4: Manager Class Updates - COMPLETED**
+
+**Files Modified:** `src/Manager.php`
+
+#### Changes Made:
+1. **New Method: `validate_and_record($code, $entry_id, $branch, $category)`**:
+   - Respects `code_assignment_mode` setting ('auto' vs 'manual')
+   - Auto mode: Uses legacy tier-based code assignment
+   - Manual mode: Validates user-entered SMART26 codes
+   - Code validation: Format, existence, active status, quota check
+   - Returns structured response: `['success' => bool, 'message' => string, 'code' => string]`
+   - Updates both database and entry meta fields
+   - Comprehensive debug logging
+
+2. **New Method: `validate_code($code)`**:
+   - Validates code without recording (for real-time frontend validation)
+   - Checks: format, existence, active status, quota, promo period
+   - Returns: `['valid' => bool, 'message' => string, 'remaining' => int]`
+   - Useful for AJAX validation endpoints
+
+3. **New Method: `get_code_from_settings($code)`** (private):
+   - Retrieves code configuration from dynamic promo_codes array
+   - Returns code details: max, description, active status
+   - Returns null if code not found
+
+4. **Updated Method: `record_reactivation($entry_id, $old_status, $new_status, $pasif_date, $user_code)`**:
+   - Now accepts optional `$user_code` parameter
+   - Auto mode: Uses tier-based get_current_code()
+   - Manual mode: Validates user-entered code, retrieves from entry meta if not provided
+   - Uses code-specific DB insertion for SMART26 mode
+   - Assigns 'passive' category to reactivations
+   - Handles branch field updates
+
+---
+
+### ✅ **PHASE 5: Documentation Updates - COMPLETED**
 
 **Files Modified:**
 - `.github/copilot-instructions.md` - Updated to SMART26 spec
@@ -98,14 +133,6 @@
 ---
 
 ## 🔄 **REMAINING PHASES (Not Started)**
-
-### Phase 5: Manager Class Updates
-**Status:** ❌ Not Started
-**Files to Modify:** `src/Manager.php`
-- [ ] Add `validate_and_record($code, $entry_id)` method
-- [ ] Integrate with Validator class
-- [ ] Deprecate `get_current_code()` for user-entered codes
-- [ ] Update `record_reactivation()` for code validation
 
 ### Phase 6: Validator Integration  
 **Status:** ⚠️ Partial - File exists but wrong spec
@@ -175,9 +202,9 @@
 
 ## 🎯 **Next Steps (Recommended Order)**
 
-1. **Update Manager.php** (2-3 hours)
-   - Add validation methods
-   - Integrate with dynamic codes
+1. ✅ **Update Manager.php** (COMPLETED)
+   - Added validation methods
+   - Integrated with dynamic codes
    
 2. **Refactor Validator.php** (2-3 hours)
    - Align with SMART26 requirements
@@ -197,7 +224,7 @@
    - All flows
    - Edge cases
 
-**Estimated Remaining Time: 14-21 hours**
+**Estimated Remaining Time: 12-18 hours** (Phase 4 completed)
 
 ---
 
