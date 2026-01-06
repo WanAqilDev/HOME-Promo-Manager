@@ -639,8 +639,9 @@ function render_admin_page()
             // Add row to visible table
             const tbody = document.querySelector('.hpm-code-stats tbody');
             const newRow = tbody.insertRow();
+            newRow.style.backgroundColor = '#fffbcc'; // Highlight new row
             newRow.innerHTML = `
-                <td><strong>${codeName}</strong></td>
+                <td><strong>${codeName}</strong> <span style="color: #d63638; font-size: 11px;">⚠ PENDING</span></td>
                 <td>${codeDesc}</td>
                 <td>0 / ${codeMax}</td>
                 <td>${codeMax}</td>
@@ -649,7 +650,7 @@ function render_admin_page()
                         <div style="width: 0%; background: #46b450; height: 100%; transition: width 0.3s;"></div>
                     </div>
                 </td>
-                <td><span style="color: #46b450;">● Active (Pending Save)</span></td>
+                <td><span style="color: #d63638; font-weight: bold;">⚠ PENDING SAVE - Not active yet!</span></td>
             `;
 
             // Clear form
@@ -657,7 +658,7 @@ function render_admin_page()
             document.getElementById('hpm_new_code_desc').value = '';
             document.getElementById('hpm_new_code_max').value = '50';
 
-            alert('Code "' + codeName + '" added! Click "Save Settings" below to persist.');
+            alert('Code "' + codeName + '" added to form!\n\n⚠ IMPORTANT: This code is NOT active yet.\nScroll down and click "Save Settings" to activate it.');
         });
 
         // Toggle Mode Functionality
@@ -671,7 +672,12 @@ function render_admin_page()
                     const msg = mode === 'auto' ? 
                         'Mode will change to Auto-Assign (Legacy) when you click "Save Settings".' :
                         'Mode will change to SMART26 (User-Entered Codes) when you click "Save Settings".';
-                    alert(msg);
+                    alert(msg + '\n\nCurrent hidden field value: ' + mode + '\n\nMake sure to scroll down and click "Save Settings" to persist this change.');
+                    console.log('[HPM] Mode toggled to:', mode);
+                    // Auto-submit the form to save immediately
+                    if (confirm('Do you want to save this change now?')) {
+                        document.querySelector('form').submit();
+                    }
                 }
             });
         });

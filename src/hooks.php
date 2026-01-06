@@ -175,7 +175,7 @@ add_action('frm_after_create_entry', function ($entry_id, $form_id) {
     }
 }, 10, 2);
 
-// NEW REGISTRATION: Set default promo value on new entry creation
+// NEW REGISTRATION: Set default promo value on new entry creation (only if user didn't provide one)
 add_filter('frm_pre_create_entry', function ($values) {
     $mgr = Manager::get_instance();
     $form_id = !empty($values['form_id']) ? (int) $values['form_id'] : 0;
@@ -184,7 +184,10 @@ add_filter('frm_pre_create_entry', function ($values) {
     if (!isset($values['item_meta']) || !is_array($values['item_meta']))
         $values['item_meta'] = [];
     $promo_key = (string) $mgr->s('promo_field_id');
-    $values['item_meta'][$promo_key] = 'Tiada';
+    // Only set default 'Tiada' if user hasn't entered a code
+    if (empty($values['item_meta'][$promo_key])) {
+        $values['item_meta'][$promo_key] = 'Tiada';
+    }
     return $values;
 });
 
