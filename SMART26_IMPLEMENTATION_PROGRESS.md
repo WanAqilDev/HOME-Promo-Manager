@@ -133,7 +133,8 @@
    - Real-time code validation before form submission
    - Only validates when mode = 'manual' (SMART26)
    - Checks if user wants to register (Daftar = Ya)
-   - Validates promo code using `Manager::validate_code()`
+   - **OPTIONAL CODE**: If no code provided, allows submission without validation
+   - Validates promo code using `Manager::validate_code()` only if code entered
    - Adds field-specific error messages if validation fails
    - Prevents form submission with invalid codes
 
@@ -141,6 +142,7 @@
    - Dual-mode support: auto-assign vs SMART26
    - Auto mode: Uses legacy `record_activation()` method
    - Manual mode: Uses new `validate_and_record()` with full validation
+   - **OPTIONAL CODE**: Skips promo tracking if code empty or 'Tiada'
    - Category detection logic:
      - `diagnostic`: Recent diagnostic date within 90 days
      - `lead`: Lead status field = 'Lead'
@@ -163,8 +165,9 @@
    - Timezone-aware date calculations
 
 #### Integration Points:
-- Form validation blocks submission if code invalid
-- New registrations automatically categorized and tracked
+- **Optional Promo Codes**: Users can submit form with or without code
+- Form validation blocks submission ONLY if invalid code entered
+- New registrations automatically categorized and tracked only when code provided
 - Reactivations require valid codes in SMART26 mode
 - Branch selection captured and stored with registration
 - All flows respect code_assignment_mode setting
@@ -258,60 +261,58 @@
 
 ## 🔄 **REMAINING PHASES**
 
-### Phase 6: Validator Integration  
-**Status:** ⚠️ OPTIONAL - File exists but wrong spec
-**Files to Modify:** `src/Validator.php`
-- [ ] Refactor existing Validator to SMART26 spec
-- [ ] Implement `validate_code($code, $entry_id)` method
-- [ ] Implement `check_eligibility($entry_id)` - 4 categories
-- [ ] Integrate with Manager class
-**Note:** Manager.php already has validation logic. This can be deferred or skipped.
-
-### Phase 9: Frontend Updates
+### Phase 9: Frontend Updates (OPTIONAL)
 **Status:** ❌ Not Started
 **Files to Modify:** `template/promo-page.php` or Formidable form templates
-- [ ] Add code input field to registration form
 - [ ] Integrate AJAX validation with /validate endpoint
 - [ ] Real-time feedback UI (remaining slots, validation errors)
 - [ ] Update counter display to show per-code stats
-- [ ] Branch selection dropdown
-
-### Phase 10: Migration Script
-**Status:** ❌ Not Started - CRITICAL BEFORE LAUNCH
-**Files to Create:** `migrate-to-smart26.php` or admin action
-- [ ] Migrate existing entries from tier-based to code-specific
-- [ ] Assign codes based on existing promo_field values
-- [ ] Update database schema for existing entries
-- [ ] Dry-run mode for testing
-- [ ] Rollback capability
-
-### Phase 8: REST API Updates
-**Status:** ❌ Not Started
-**Files to Modify:** `src/rest.php`
-- [ ] Update `/counter` endpoint for multi-code stats
-- [ ] Add `/validate` POST endpoint for real-time validation
-- [ ] Return code-specific data (not tier-based)
-
-### Phase 9: Frontend Updates
-**Status:** ⚠️ Template exists, needs code validation UI
-**Files to Modify:** `template/promo-page.php`
-- [ ] Add code validation UI/UX
-- [ ] Update API calls for multi-code data
-- [ ] Display per-code availability
+- Code input field already exists (field 3170)
+- Branch selection dropdown already exists
 
 ### Phase 10: Testing
-**Status:** ❌ Not Started
-**Files to Create:**
-- [ ] `tests/test-validator.php`
-- [ ] `tests/test-smart26-integration.php`
-- [ ] Manual test scenarios
+**Status:** ⚠️ CRITICAL - Test plan created
+**Files:** `SMART26_TEST_PLAN.md`
+- [ ] Execute 31 test cases from test plan
+- [ ] Verify optional code behavior (Test 2.2)
+- [ ] Test all category detection logic
+- [ ] Validate API endpoints
+- [ ] Check admin dashboard functionality
+- [ ] Edge case and security testing
 
-### Phase 11: Migration Script
-**Status:** ❌ Not Started
-**Files to Create:**
-- [ ] `migrations/migrate_v1_to_v2.php`
-- [ ] Backup procedure
-- [ ] Rollback plan
+---
+
+## 🎯 **Next Steps (Recommended Order)**
+
+1. ✅ **Update Manager.php** (COMPLETED)
+2. ✅ **Update Formidable Hooks** (COMPLETED)
+3. ✅ **Update REST API** (COMPLETED)
+4. ✅ **Create Test Plan** (COMPLETED)
+5. ✅ **Make Codes Optional** (COMPLETED)
+
+6. **Execute Testing** (4-6 hours) - CRITICAL
+   - Follow SMART26_TEST_PLAN.md
+   - Priority: Test 2.2 (optional code submission)
+   - Verify all 31 test cases
+   - Document any issues found
+
+7. **Frontend Updates** (OPTIONAL - 2-3 hours)
+   - AJAX validation for better UX
+   - Real-time counter display
+
+**Estimated Remaining Time: 4-9 hours** (Core system complete, testing required)
+
+**System Status:** 🟢 **Ready for testing - codes are now optional!**
+- ✅ Database schema updated
+- ✅ Admin UI with dynamic code management
+- ✅ Manager validation methods  
+- ✅ Formidable hooks integrated (codes optional)
+- ✅ REST API endpoints active
+- ✅ Comprehensive test plan created
+- ⚠️ Testing execution pending
+- ✅ Migration script not needed (skipped)
+
+**Key Feature:** Users can now submit forms **with or without** promo codes. Validation only runs if a code is entered.
 
 ---
 
@@ -322,8 +323,13 @@
 | 1. Database Schema | ✅ Done | 100% | CRITICAL |
 | 2. Settings Refactor | ✅ Done | 100% | CRITICAL |
 | 3. DB Methods | ✅ Done | 100% | HIGH |
-| 4. Admin UI | ✅ Done | 100% | MEDIUM |
-| 5. Manager Updates | ❌ Not Started | 0% | HIGH |
+| 4. Manager Updates | ✅ Done | 100% | HIGH |
+| 5. Admin UI + Toggle | ✅ Done | 100% | MEDIUM |
+| 7. Formidable Hooks | ✅ Done | 100% | CRITICAL |
+| 8. REST API | ✅ Done | 100% | HIGH |
+| 9. Test Plan Created | ✅ Done | 100% | CRITICAL |
+| 10. Testing Execution | ⏳ Pending | 0% | CRITICAL |
+| Frontend Updates | ⬜ Optional | 0% | LOW |
 | 6. Validator | ⚠️ Wrong spec | 10% | HIGH |
 | 7. Formidable Hooks | ❌ Not Started | 0% | CRITICAL |
 | 8. REST API | ❌ Not Started | 0% | MEDIUM |

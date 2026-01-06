@@ -48,7 +48,15 @@ add_filter('frm_validate_entry', function ($errors, $values) {
         ));
     }
 
-    // Validate the code
+    // OPTIONAL: If no code provided, allow submission (user chooses not to use promo)
+    if (empty($code)) {
+        if ($mgr->s('debug_mode')) {
+            error_log('[HPM-VALIDATE] No code provided - allowing submission without promo');
+        }
+        return $errors; // No validation needed
+    }
+
+    // Validate the code (only if user entered one)
     $validation = $mgr->validate_code($code);
     
     if (!$validation['valid']) {
@@ -143,7 +151,15 @@ add_action('frm_after_create_entry', function ($entry_id, $form_id) {
             ));
         }
         
-        // Validate and record with SMART26 system
+        // OPTIONAL: If no code provided, skip promo tracking (user chose not to use promo)
+        if (empty($code) || $code === 'Tiada') {
+            if ($mgr->s('debug_mode')) {
+                error_log('[HPM-CREATE] No promo code - skipping SMART26 tracking');
+            }
+            return; // User submitted without promo code, that's OK
+        }
+        
+        // Validate and record with SMART26 system (only if code provided)
         $result = $mgr->validate_and_record($code, $entry_id, $branch, $category);
         
         if ($result['success']) {
