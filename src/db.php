@@ -9,6 +9,21 @@ class DB
     const TABLE_BASE = 'home_promo_counted';
     const REACTIVATION_TABLE_BASE = 'home_promo_reactivations';
 
+    /**
+     * Get default SMART26 promo codes (DRY - single source of truth)
+     *
+     * @return array Default promo codes configuration
+     */
+    public static function get_default_promo_codes()
+    {
+        return [
+            'SMART26-LIVE1' => ['max' => 50, 'description' => 'Live Session 1', 'active' => true],
+            'SMART26-LIVE2' => ['max' => 50, 'description' => 'Live Session 2', 'active' => true],
+            'SMART26-LIVE3' => ['max' => 50, 'description' => 'Live Session 3', 'active' => true],
+            'SMART26-LIVE4' => ['max' => 50, 'description' => 'Live Session 4', 'active' => true],
+        ];
+    }
+
     public static function table_name()
     {
         global $wpdb;
@@ -78,12 +93,7 @@ class DB
                 'branch_field_id' => 0,
                 'passive_threshold_days' => 90,
                 'code_assignment_mode' => 'manual',  // 'auto' or 'manual'
-                'promo_codes' => [
-                    'SMART26-LIVE1' => ['max' => 50, 'description' => 'Live Session 1', 'active' => true],
-                    'SMART26-LIVE2' => ['max' => 50, 'description' => 'Live Session 2', 'active' => true],
-                    'SMART26-LIVE3' => ['max' => 50, 'description' => 'Live Session 3', 'active' => true],
-                    'SMART26-LIVE4' => ['max' => 50, 'description' => 'Live Session 4', 'active' => true],
-                ],
+                'promo_codes' => self::get_default_promo_codes(),  // Use shared defaults
                 'total_max' => 200,
                 'base_price' => 200.00,
                 'discount_amount' => 52.00,

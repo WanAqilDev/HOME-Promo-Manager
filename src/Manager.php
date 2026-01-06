@@ -87,9 +87,9 @@ class Manager
 
         $active = ($now >= $start && $now < $end);
 
-        if ($this->s('debug_mode') || true) { // FORCE LOGGING TEMPORARILY
+        if ($this->s('debug_mode')) {
             error_log(sprintf(
-                '[HPM-DEBUG-FORCE] is_active check: Now=%s, Start=%s, End=%s, Result=%s',
+                '[HPM-DEBUG] is_active check: Now=%s, Start=%s, End=%s, Result=%s',
                 $now->format('Y-m-d H:i:s'),
                 $start->format('Y-m-d H:i:s'),
                 $end->format('Y-m-d H:i:s'),
@@ -341,6 +341,15 @@ class Manager
     private function get_code_from_settings($code)
     {
         $promo_codes = $this->s('promo_codes') ?: [];
+        
+        if ($this->s('debug_mode')) {
+            error_log(sprintf(
+                '[HPM-DEBUG] get_code_from_settings(%s) - Available codes: %s',
+                $code,
+                implode(', ', array_keys($promo_codes))
+            ));
+        }
+        
         return $promo_codes[$code] ?? null;
     }
 

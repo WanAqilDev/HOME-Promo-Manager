@@ -80,13 +80,8 @@ function sanitize_settings($input)
             }
         }
     } else {
-        // Keep existing codes if not updated
-        $out['promo_codes'] = $defaults['promo_codes'] ?? [
-            'SMART26-LIVE1' => ['max' => 50, 'description' => 'Live Session 1', 'active' => true],
-            'SMART26-LIVE2' => ['max' => 50, 'description' => 'Live Session 2', 'active' => true],
-            'SMART26-LIVE3' => ['max' => 50, 'description' => 'Live Session 3', 'active' => true],
-            'SMART26-LIVE4' => ['max' => 50, 'description' => 'Live Session 4', 'active' => true],
-        ];
+        // Keep existing codes if not updated - use shared defaults from DB class
+        $out['promo_codes'] = $defaults['promo_codes'] ?? DB::get_default_promo_codes();
     }
 
     // SMART26: Pricing
@@ -338,7 +333,7 @@ function render_admin_page()
                         <li>No user input required</li>
                     </ul>
                     <?php if ($current_mode !== 'auto'): ?>
-                        <button type="button" onclick="document.getElementById('mode_auto').checked=true; this.closest('form').querySelector('[name=\"home_promo_manager_settings[code_assignment_mode]\"]').value='auto'; alert('Mode changed to Auto-Assign. Click Save Changes below.');" class="button">Switch to Auto</button>
+                        <button type="button" data-toggle-mode="auto" class="button hpm-mode-toggle-btn">Switch to Auto</button>
                     <?php else: ?>
                         <strong style="color: #2271b1;">✓ Active</strong>
                     <?php endif; ?>
@@ -356,7 +351,7 @@ function render_admin_page()
                         <li>4-category eligibility validation</li>
                     </ul>
                     <?php if ($current_mode !== 'manual'): ?>
-                        <button type="button" onclick="document.getElementById('mode_manual').checked=true; this.closest('form').querySelector('[name=\"home_promo_manager_settings[code_assignment_mode]\"]').value='manual'; alert('Mode changed to SMART26. Click Save Changes below.');" class="button">Switch to SMART26</button>
+                        <button type="button" data-toggle-mode="manual" class="button hpm-mode-toggle-btn">Switch to SMART26</button>
                     <?php else: ?>
                         <strong style="color: #2271b1;">✓ Active</strong>
                     <?php endif; ?>
@@ -588,5 +583,98 @@ function render_admin_page()
                 </p>
             </form>
         </div>
+
+        <script>
+        // Add Code Button Functionality
+        document.getElementById('hpm-add-code-btn')?.addEventListener('click', function() {
+            const codeName = document.getElementById('hpm_new_code_name').value.trim().toUpperCase();
+            const codeDesc = document.getElementById('hpm_new_code_desc').value.trim();
+            const codeMax = parseInt(document.getElementById('hpm_new_code_max').value) || 50;
+
+            // Validation
+            if (!codeName) {
+                alert('Please enter a code name');
+                return;
+            }
+
+            // Check code format (alphanumeric + hyphens only)
+            if (!/^[A-Z0-9\-]+$/i.test(codeName)) {
+                alert('Code name can only contain letters, numbers, and hyphens');
+                return;
+            }
+
+            // Check for duplicate
+            const existingCodes = document.querySelectorAll('[name*="[promo_codes]["]');
+            let duplicate = false;
+            existingCodes.forEach(el => {
+                if (el.name.includes('[promo_codes][' + codeName + ']')) {
+                    duplicate = true;
+                }
+            });
+
+            if (duplicate) {
+                alert('Code "' + codeName + '" already exists!');
+                return;
+            }
+
+            // Get the form
+            const form = document.querySelector('form[action="options.php"]');
+            const hiddenContainer = form.querySelector('tbody');
+
+            // Create hidden fields for new code
+            const inputs = [
+                {name: 'home_promo_manager_settings[promo_codes][' + codeName + '][max]', value: codeMax},
+                {name: 'home_promo_manager_settings[promo_codes][' + codeName + '][description]', value: codeDesc},
+                {name: 'home_promo_manager_settings[promo_codes][' + codeName + '][active]', value: '1'}
+            ];
+
+            inputs.forEach(inp => {
+                const hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.name = inp.name;
+                hidden.value = inp.value;
+                form.appendChild(hidden);
+            });
+
+            // Add row to visible table
+            const tbody = document.querySelector('.hpm-code-stats tbody');
+            const newRow = tbody.insertRow();
+            newRow.innerHTML = `
+                <td><strong>${codeName}</strong></td>
+                <td>${codeDesc}</td>
+                <td>0 / ${codeMax}</td>
+                <td>${codeMax}</td>
+                <td>
+                    <div style="background: #e0e0e0; height: 20px; border-radius: 3px; overflow: hidden;">
+                        <div style="width: 0%; background: #46b450; height: 100%; transition: width 0.3s;"></div>
+                    </div>
+                </td>
+                <td><span style="color: #46b450;">● Active (Pending Save)</span></td>
+            `;
+
+            // Clear form
+            document.getElementById('hpm_new_code_name').value = '';
+            document.getElementById('hpm_new_code_desc').value = '';
+            document.getElementById('hpm_new_code_max').value = '50';
+
+            alert('Code "' + codeName + '" added! Click "Save Settings" below to persist.');
+        });
+
+        // Toggle Mode Functionality
+        document.querySelectorAll('.hpm-mode-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const mode = this.getAttribute('data-toggle-mode');
+                const hiddenField = document.querySelector('[name="home_promo_manager_settings[code_assignment_mode]"]');
+                if (hiddenField && mode) {
+                    hiddenField.value = mode;
+                    const msg = mode === 'auto' ? 
+                        'Mode will change to Auto-Assign (Legacy) when you click "Save Settings".' :
+                        'Mode will change to SMART26 (User-Entered Codes) when you click "Save Settings".';
+                    alert(msg);
+                }
+            });
+        });
+        </script>
         <?php
 }
