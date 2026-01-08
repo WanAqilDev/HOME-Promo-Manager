@@ -87,9 +87,9 @@ class Manager
 
         $active = ($now >= $start && $now < $end);
 
-        if ($this->s('debug_mode') || true) { // FORCE LOGGING TEMPORARILY
+        if ($this->s('debug_mode')) {
             error_log(sprintf(
-                '[HPM-DEBUG-FORCE] is_active check: Now=%s, Start=%s, End=%s, Result=%s',
+                '[HPM-DEBUG] is_active check: Now=%s, Start=%s, End=%s, Result=%s',
                 $now->format('Y-m-d H:i:s'),
                 $start->format('Y-m-d H:i:s'),
                 $end->format('Y-m-d H:i:s'),
@@ -116,6 +116,241 @@ class Manager
         if ($daftar === 'Ya') {
             $this->record_activation($entry_id);
         }
+    }
+
+    /**
+     * Validate and record a promo code registration (SMART26)
+     * Respects code_assignment_mode setting
+     *
+     * @param string $code User-entered promo code
+     * @param int $entry_id Formidable entry ID
+     * @param string $branch Branch selection
+     * @param string $category User category (new/passive/diagnostic/lead)
+     * @return array ['success' => bool, 'message' => string, 'code' => string]
+     */
+    public function validate_and_record($code, $entry_id, $branch = '', $category = 'new')
+    {
+        if ($this->s('debug_mode')) {
+            error_log(sprintf(
+                '[HPM-DEBUG] validate_and_record called: code=%s, entry=%d, branch=%s, category=%s',
+                $code, $entry_id, $branch, $category
+            ));
+        }
+
+        // Check if promo is active
+        if (!$this->is_active()) {
+            return [
+                'success' => false,
+                'message' => 'Promo period has ended.',
+                'code' => ''
+            ];
+        }
+
+        // Get code assignment mode
+        $mode = $this->s('code_assignment_mode') ?: 'manual';
+
+        if ($mode === 'auto') {
+            // Legacy mode: auto-assign tier-based code
+            if ($this->s('debug_mode')) {
+                error_log('[HPM-DEBUG] Using auto-assign mode (legacy)');
+            }
+            $count = $this->get_count();
+            $assigned_code = $this->get_current_code($count);
+            
+            if (!$assigned_code) {
+                return [
+                    'success' => false,
+                    'message' => 'All promo slots are full.',
+                    'code' => ''
+                ];
+            }
+
+            // Record with auto-assigned code
+            $max = (int) $this->s('max');
+            $inserted = DB::insert_entry($entry_id, $max);
+            
+            if ($inserted) {
+                // Update entry with assigned code
+                $promo_field_id = (int) $this->s('promo_field_id');
+                ff_update_entry_meta($entry_id, $promo_field_id, $assigned_code);
+                
+                return [
+                    'success' => true,
+                    'message' => 'Registration successful.',
+                    'code' => $assigned_code
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => 'Failed to record registration.',
+                'code' => ''
+            ];
+        }
+
+        // Manual mode: SMART26 code validation
+        if ($this->s('debug_mode')) {
+            error_log('[HPM-DEBUG] Using manual mode (SMART26)');
+        }
+
+        // Validate code format
+        if (empty($code)) {
+            return [
+                'success' => false,
+                'message' => 'Please enter a promo code.',
+                'code' => ''
+            ];
+        }
+
+        // Validate code exists and is active
+        $code_config = $this->get_code_from_settings($code);
+        if (!$code_config) {
+            return [
+                'success' => false,
+                'message' => 'Invalid promo code.',
+                'code' => ''
+            ];
+        }
+
+        if (!($code_config['active'] ?? true)) {
+            return [
+                'success' => false,
+                'message' => 'This promo code is no longer active.',
+                'code' => ''
+            ];
+        }
+
+        // Check code quota
+        $max_for_code = (int) ($code_config['max'] ?? 0);
+        $used = DB::get_code_usage($code);
+        
+        if ($used >= $max_for_code) {
+            return [
+                'success' => false,
+                'message' => 'This promo code has reached its maximum limit.',
+                'code' => ''
+            ];
+        }
+
+        // Record with code-specific tracking
+        $inserted = DB::insert_entry_with_code($entry_id, $code, $branch, $category, $max_for_code);
+        
+        if ($inserted) {
+            // Update entry with validated code
+            $promo_field_id = (int) $this->s('promo_field_id');
+            ff_update_entry_meta($entry_id, $promo_field_id, $code);
+            
+            // Update branch field if provided
+            if (!empty($branch)) {
+                $branch_field_id = (int) $this->s('branch_field_id');
+                if ($branch_field_id) {
+                    ff_update_entry_meta($entry_id, $branch_field_id, $branch);
+                }
+            }
+            
+            if ($this->s('debug_mode')) {
+                error_log(sprintf(
+                    '[HPM-DEBUG] Code %s registered successfully for entry %d (used: %d/%d)',
+                    $code, $entry_id, $used + 1, $max_for_code
+                ));
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Registration successful! Your promo code has been applied.',
+                'code' => $code
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => 'Failed to record registration. Please try again.',
+            'code' => ''
+        ];
+    }
+
+    /**
+     * Validate a promo code without recording
+     *
+     * @param string $code Promo code to validate
+     * @return array ['valid' => bool, 'message' => string, 'remaining' => int]
+     */
+    public function validate_code($code)
+    {
+        if (empty($code)) {
+            return [
+                'valid' => false,
+                'message' => 'Please enter a promo code.',
+                'remaining' => 0
+            ];
+        }
+
+        // Get code configuration
+        $code_config = $this->get_code_from_settings($code);
+        if (!$code_config) {
+            return [
+                'valid' => false,
+                'message' => 'Invalid promo code.',
+                'remaining' => 0
+            ];
+        }
+
+        if (!($code_config['active'] ?? true)) {
+            return [
+                'valid' => false,
+                'message' => 'This promo code is no longer active.',
+                'remaining' => 0
+            ];
+        }
+
+        // Check quota
+        $max = (int) ($code_config['max'] ?? 0);
+        $used = DB::get_code_usage($code);
+        $remaining = max(0, $max - $used);
+
+        if ($remaining <= 0) {
+            return [
+                'valid' => false,
+                'message' => 'This promo code has reached its maximum limit.',
+                'remaining' => 0
+            ];
+        }
+
+        // Check if promo is active
+        if (!$this->is_active()) {
+            return [
+                'valid' => false,
+                'message' => 'Promo period has ended.',
+                'remaining' => 0
+            ];
+        }
+
+        return [
+            'valid' => true,
+            'message' => sprintf('Valid! %d slot%s remaining.', $remaining, $remaining === 1 ? '' : 's'),
+            'remaining' => $remaining
+        ];
+    }
+
+    /**
+     * Get code configuration from settings
+     *
+     * @param string $code Promo code
+     * @return array|null Code configuration or null if not found
+     */
+    private function get_code_from_settings($code)
+    {
+        $promo_codes = $this->s('promo_codes') ?: [];
+        
+        if ($this->s('debug_mode')) {
+            error_log(sprintf(
+                '[HPM-DEBUG] get_code_from_settings(%s) - Available codes: %s',
+                $code,
+                implode(', ', array_keys($promo_codes))
+            ));
+        }
+        
+        return $promo_codes[$code] ?? null;
     }
 
     public function record_activation($entry_id)
@@ -163,15 +398,51 @@ class Manager
      * @param string $pasif_date
      * @return bool
      */
-    public function record_reactivation($entry_id, $old_status, $new_status, $pasif_date)
+    public function record_reactivation($entry_id, $old_status, $new_status, $pasif_date, $user_code = '')
     {
         error_log('[HPM] Manager::record_reactivation called for entry ' . $entry_id);
 
-        // Get promo code first
-        $count = $this->get_count();
-        $code = $this->get_current_code($count);
+        // Get code assignment mode
+        $mode = $this->s('code_assignment_mode') ?: 'manual';
+        $code = '';
+        $branch = '';
+        $category = 'passive'; // Reactivations are passive category
 
-        error_log('[HPM] Count: ' . $count . ', Promo code: ' . $code);
+        if ($mode === 'auto') {
+            // Auto mode: use tier-based code
+            $count = $this->get_count();
+            $code = $this->get_current_code($count);
+            error_log('[HPM] Auto mode - Count: ' . $count . ', Promo code: ' . $code);
+        } else {
+            // Manual mode: validate user-entered code
+            if (empty($user_code)) {
+                // Try to get code from entry meta (may have been set during validation)
+                $promo_field_id = (int) $this->s('promo_field_id');
+                $user_code = ff_get_field_value_robust($entry_id, $promo_field_id);
+            }
+
+            if (empty($user_code)) {
+                error_log('[HPM] SMART26 mode - No promo code provided for reactivation');
+                return false;
+            }
+
+            // Validate the code
+            $validation = $this->validate_code($user_code);
+            if (!$validation['valid']) {
+                error_log('[HPM] SMART26 mode - Invalid code: ' . $validation['message']);
+                return false;
+            }
+
+            $code = $user_code;
+            
+            // Get branch if available
+            $branch_field_id = (int) $this->s('branch_field_id');
+            if ($branch_field_id) {
+                $branch = ff_get_field_value_robust($entry_id, $branch_field_id) ?: '';
+            }
+
+            error_log('[HPM] SMART26 mode - Code validated: ' . $code);
+        }
 
         // Log to reactivation table
         $logged = DB::log_reactivation($entry_id, $old_status, $new_status, $pasif_date, $code);
@@ -206,8 +477,15 @@ class Manager
 
         // Count this as an activation
         error_log('[HPM] Counting reactivation as activation');
-        $max = (int) $this->s('max');
-        DB::insert_entry($entry_id, $max);
+        if ($mode === 'auto') {
+            $max = (int) $this->s('max');
+            DB::insert_entry($entry_id, $max);
+        } else {
+            // SMART26 mode: use code-specific insertion
+            $code_config = $this->get_code_from_settings($code);
+            $max_for_code = (int) ($code_config['max'] ?? 0);
+            DB::insert_entry_with_code($entry_id, $code, $branch, $category, $max_for_code);
+        }
 
         error_log('[HPM] Reactivation complete for entry ' . $entry_id);
 
