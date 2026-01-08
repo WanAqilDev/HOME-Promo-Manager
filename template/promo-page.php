@@ -582,6 +582,18 @@ if (class_exists('\HPM\Manager')) {
         setInterval(checkPromoEligibility, 2000);
 
     </script>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 py-8 mt-16">
+        <div class="max-w-4xl mx-auto px-4 text-center">
+            <p class="text-sm mb-2">
+                &copy; 2026 <span class="text-white font-semibold">HOME Math Therapy</span>. All rights reserved.
+            </p>
+            <p class="text-xs">
+                Powered by <a href="https://qcxis.com" target="_blank" rel="noopener" class="text-brandblue hover:text-brandgreen transition-colors">QCXIS Sdn Bhd</a>
+            </p>
+        </div>
+    </footer>
 </body>
 
 </html>
