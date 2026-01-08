@@ -28,6 +28,7 @@ define('HOME_PROMO_MANAGER_VERSION', '0.1.10');
 require_once __DIR__ . '/src/utils.php';
 require_once __DIR__ . '/src/db.php';
 require_once __DIR__ . '/src/Manager.php';
+require_once __DIR__ . '/src/Validator.php';
 require_once __DIR__ . '/src/admin.php';
 require_once __DIR__ . '/src/rest.php';
 require_once __DIR__ . '/src/shortcodes.php';

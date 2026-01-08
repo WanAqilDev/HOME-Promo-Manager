@@ -11,17 +11,13 @@ class DB
 
     /**
      * Get default SMART26 promo codes (DRY - single source of truth)
+     * Starting with empty array - admins add codes via dashboard
      *
      * @return array Default promo codes configuration
      */
     public static function get_default_promo_codes()
     {
-        return [
-            'SMART26-LIVE1' => ['max' => 50, 'description' => 'Live Session 1', 'active' => true],
-            'SMART26-LIVE2' => ['max' => 50, 'description' => 'Live Session 2', 'active' => true],
-            'SMART26-LIVE3' => ['max' => 50, 'description' => 'Live Session 3', 'active' => true],
-            'SMART26-LIVE4' => ['max' => 50, 'description' => 'Live Session 4', 'active' => true],
-        ];
+        return [];
     }
 
     public static function table_name()
@@ -191,6 +187,7 @@ class DB
 
     /**
      * SMART26: Insert entry with code tracking
+     * ATOMIC OPERATION - prevents race conditions and quota spillover
      * 
      * @param int $entry_id Formidable entry ID
      * @param string $code Promo code used
@@ -204,37 +201,64 @@ class DB
         global $wpdb;
         $table = self::table_name();
         $entry_id = (int) $entry_id;
+        $code_safe = sanitize_text_field($code);
+        $branch_safe = sanitize_text_field($branch);
+        $category_safe = sanitize_text_field($category);
 
-        // Check code-specific quota if limit provided
         if ($limit !== null) {
+            // ATOMIC: Check quota and insert in single query to prevent race conditions
+            // This ensures two simultaneous requests can't both grab the "last slot"
             $limit = (int) $limit;
-            $current_usage = self::get_code_usage($code);
             
-            if ($current_usage >= $limit) {
-                error_log('[HPM] Code quota exceeded: ' . $code . ' (' . $current_usage . '/' . $limit . ')');
+            $query = $wpdb->prepare(
+                "INSERT IGNORE INTO {$table} (entry_id, promo_code, branch, user_category, eligibility_verified)
+                 SELECT %d, %s, %s, %s, 1 FROM DUAL
+                 WHERE (SELECT COUNT(*) FROM {$table} WHERE promo_code = %s) < %d",
+                $entry_id,
+                $code_safe,
+                $branch_safe,
+                $category_safe,
+                $code_safe, // For quota check
+                $limit
+            );
+            
+            $res = $wpdb->query($query);
+            
+            if ($res === false) {
+                error_log('[HPM] Atomic insert failed: ' . $wpdb->last_error);
                 return false;
             }
+            
+            // Check if row was actually inserted
+            $inserted = ($wpdb->rows_affected > 0);
+            
+            if (!$inserted) {
+                error_log("[HPM] Code quota reached atomically: {$code} (limit: {$limit})");
+            }
+            
+            return $inserted;
+            
+        } else {
+            // No limit check - direct insert
+            $res = $wpdb->insert(
+                $table,
+                [
+                    'entry_id' => $entry_id,
+                    'promo_code' => $code_safe,
+                    'branch' => $branch_safe,
+                    'user_category' => $category_safe,
+                    'eligibility_verified' => 1,
+                ],
+                ['%d', '%s', '%s', '%s', '%d']
+            );
+
+            if ($res === false) {
+                error_log('[HPM] Failed to insert entry with code: ' . $wpdb->last_error);
+                return false;
+            }
+
+            return ($wpdb->insert_id > 0);
         }
-
-        // Insert with code tracking
-        $res = $wpdb->insert(
-            $table,
-            [
-                'entry_id' => $entry_id,
-                'promo_code' => sanitize_text_field($code),
-                'branch' => sanitize_text_field($branch),
-                'user_category' => sanitize_text_field($category),
-                'eligibility_verified' => 1,
-            ],
-            ['%d', '%s', '%s', '%s', '%d']
-        );
-
-        if ($res === false) {
-            error_log('[HPM] Failed to insert entry with code: ' . $wpdb->last_error);
-            return false;
-        }
-
-        return ($wpdb->insert_id > 0);
     }
 
     /**

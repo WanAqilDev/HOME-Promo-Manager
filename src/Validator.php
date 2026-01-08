@@ -1,6 +1,6 @@
 <?php
 
-namespace HomePromoManager;
+namespace HPM;
 
 use DateTime;
 use Exception;
