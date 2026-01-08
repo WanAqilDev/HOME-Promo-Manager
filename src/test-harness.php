@@ -11,10 +11,9 @@ if (!defined('ABSPATH'))
 
 // Register test harness admin page
 add_action('admin_menu', function () {
-    add_submenu_page(
-        'home-promo-manager',
-        'Test Harness',
-        'Test Harness',
+    add_management_page(
+        'Promo Test Harness',
+        'Promo Test Harness',
         'manage_options',
         'hpm-test-harness',
         '\\HPM\\render_test_harness_page'

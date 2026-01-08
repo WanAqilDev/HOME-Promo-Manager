@@ -9,9 +9,8 @@ This guide helps participants test all possible scenarios for the promo code sys
 
 ### For Administrators
 1. Login to WordPress admin
-2. Navigate to **Settings > HOME Promo Manager**
-3. Click on **Test Harness** submenu
-4. You'll see the testing interface with current system status
+2. Navigate to **Tools > Promo Test Harness**
+3. You'll see the testing interface with current system status
 
 ### Test Harness Features
 - ✅ View current promo status and code quotas

@@ -2,7 +2,7 @@
 
 ## Access Test Harness
 ```
-WordPress Admin → Settings → HOME Promo Manager → Test Harness
+WordPress Admin → Tools → Promo Test Harness
 ```
 
 ## Quick Test (3 steps)
@@ -135,7 +135,13 @@ All test entries use entry_id starting from **999900** to distinguish from produ
 2. Document any unexpected behavior
 3. Click "Clear All Test Data" button
 4. Verify quotas return to pre-test state
+---
 
+## Finding the Test Harness
+
+**Location**: WordPress Admin → **Tools** → **Promo Test Harness**
+
+(Not under Settings - it's in the Tools menu for easy access)
 ---
 
 ## Need Help?
