@@ -34,6 +34,7 @@ require_once __DIR__ . '/src/rest.php';
 require_once __DIR__ . '/src/shortcodes.php';
 require_once __DIR__ . '/src/templates.php';
 require_once __DIR__ . '/src/hooks.php';
+require_once __DIR__ . '/src/test-harness.php';
 
 // Activation / uninstall
 register_activation_hook(__FILE__, ['\\HPM\\DB', 'install']);
