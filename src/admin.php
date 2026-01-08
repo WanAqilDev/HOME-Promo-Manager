@@ -12,6 +12,56 @@ if (!defined('ABSPATH'))
  * - Provides manual Clear Counted Entries button (with nonce).
  */
 
+// AJAX handler for realtime stats updates
+add_action('wp_ajax_hpm_get_realtime_stats', function() {
+    $code_stats_array = DB::get_code_stats();
+    $mgr = Manager::get_instance();
+    $promo_codes = $mgr->s('promo_codes') ?: [];
+    
+    // Convert array to associative map
+    $code_usage_map = [];
+    foreach ($code_stats_array as $stat) {
+        $code_usage_map[$stat['promo_code']] = (int) $stat['count'];
+    }
+    
+    $codes_data = [];
+    $total_used = 0;
+    $total_max = 0;
+    
+    foreach ($promo_codes as $code => $config) {
+        if (!($config['active'] ?? true)) {
+            continue;
+        }
+        
+        $used = $code_usage_map[$code] ?? 0;
+        $max = (int) ($config['max'] ?? 0);
+        $remaining = max(0, $max - $used);
+        $percentage = $max > 0 ? ($used / $max) * 100 : 0;
+        
+        $codes_data[$code] = [
+            'used' => $used,
+            'max' => $max,
+            'remaining' => $remaining,
+            'percentage' => $percentage
+        ];
+        
+        $total_used += $used;
+        $total_max += $max;
+    }
+    
+    $response = [
+        'codes' => $codes_data,
+        'total' => [
+            'used' => $total_used,
+            'max' => $total_max,
+            'remaining' => max(0, $total_max - $total_used),
+            'percentage' => $total_max > 0 ? ($total_used / $total_max) * 100 : 0
+        ]
+    ];
+    
+    wp_send_json_success($response);
+});
+
 // Register admin menu and settings
 add_action('admin_menu', function () {
     add_options_page(
@@ -241,15 +291,39 @@ function render_admin_page()
 
         <?php
         $mgr = Manager::get_instance();
-        $count = $mgr->get_count();
-        $max = (int) $opts['max'];
+        $current_mode = $opts['code_assignment_mode'] ?? 'manual';
+        
+        // Get stats based on mode
+        if ($current_mode === 'manual') {
+            // SMART26 mode: sum all active codes
+            $promo_codes = $opts['promo_codes'] ?? [];
+            $total_max = 0;
+            foreach ($promo_codes as $config) {
+                if ($config['active'] ?? true) {
+                    $total_max += (int)$config['max'];
+                }
+            }
+            $count = $mgr->get_count(); // Total used
+            $max = $total_max;
+            
+            // Get last code used for "current tier" display
+            global $wpdb;
+            $table = DB::table_name();
+            $last_code = $wpdb->get_var("SELECT promo_code FROM {$table} ORDER BY entry_id DESC LIMIT 1");
+            $current_tier = $last_code ? $last_code : 'No registrations yet';
+        } else {
+            // Legacy mode
+            $count = $mgr->get_count();
+            $max = (int) $opts['max'];
+            $tier1 = (int) $opts['tier1_max'];
+            $current_tier = ($count < $tier1) ? 'Tier 1' : 'Tier 2';
+        }
+        
         $percent = $max > 0 ? min(100, ($count / $max) * 100) : 0;
         $is_active = $mgr->is_active();
         $status_text = $is_active ? 'Active' : 'Inactive';
         $status_class = $is_active ? 'hpm-status-active' : 'hpm-status-inactive';
         $reactivations = DB::count_reactivations();
-        $tier1 = (int) $opts['tier1_max'];
-        $current_tier = ($count < $tier1) ? 'Tier 1' : 'Tier 2';
 
         // Check for existing promo page
         $promo_pages = get_posts([
@@ -276,9 +350,9 @@ function render_admin_page()
                 </div>
             </div>
             <div class="hpm-card">
-                <h3>Current Tier</h3>
-                <div class="hpm-stat"><?php echo $current_tier; ?></div>
-                <p>Tier 1 Limit: <?php echo $tier1; ?></p>
+                <h3><?php echo $current_mode === 'manual' ? 'Last Code Used' : 'Current Tier'; ?></h3>
+                <div class="hpm-stat" style="<?php echo $current_mode === 'manual' ? 'font-size: 1.2em;' : ''; ?>"><?php echo esc_html($current_tier); ?></div>
+                <p><?php echo $current_mode === 'manual' ? 'Most recent registration' : 'Tier 1 Limit: ' . ($tier1 ?? 0); ?></p>
             </div>
             <div class="hpm-card">
                 <h3>Reactivations</h3>
@@ -357,8 +431,6 @@ function render_admin_page()
                     <?php endif; ?>
                 </div>
             </div>
-
-            <input type="hidden" name="home_promo_manager_settings[code_assignment_mode]" value="<?php echo esc_attr($current_mode); ?>" />
         </div>
 
         <!-- SMART26: Dynamic Code Management Section -->
@@ -378,13 +450,14 @@ function render_admin_page()
             <table class="wp-list-table widefat fixed striped" style="margin-bottom: 20px;">
                 <thead>
                     <tr>
-                        <th style="width: 200px;">Code</th>
+                        <th style="width: 180px;">Code</th>
                         <th>Description</th>
-                        <th style="width: 80px;">Used</th>
-                        <th style="width: 80px;">Max</th>
-                        <th style="width: 100px;">Remaining</th>
-                        <th style="width: 200px;">Progress</th>
-                        <th style="width: 100px;">Status</th>
+                        <th style="width: 70px;">Used</th>
+                        <th style="width: 70px;">Max</th>
+                        <th style="width: 90px;">Remaining</th>
+                        <th style="width: 180px;">Progress</th>
+                        <th style="width: 90px;">Status</th>
+                        <th style="width: 150px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="hpm-codes-list">
@@ -417,6 +490,17 @@ function render_admin_page()
                         </td>
                         <td>
                             <span class="dashicons dashicons-<?php echo $active ? 'yes-alt' : 'archive'; ?>" style="color: <?php echo $active ? '#00a32a' : '#dba617'; ?>;"></span>
+                            <strong style="color: <?php echo $active ? '#00a32a' : '#dba617'; ?>;"><?php echo $active ? 'Active' : 'Inactive'; ?></strong>
+                        </td>
+                        <td>
+                            <button type="button" class="button button-small hpm-toggle-code" data-code="<?php echo esc_attr($code); ?>" data-active="<?php echo $active ? '1' : '0'; ?>" style="margin-bottom: 4px; width: 100%;">
+                                <span class="dashicons dashicons-<?php echo $active ? 'visibility' : 'hidden'; ?>" style="font-size: 14px; width: 14px; height: 14px;"></span>
+                                <?php echo $active ? 'Deactivate' : 'Activate'; ?>
+                            </button>
+                            <button type="button" class="button button-small button-link-delete hpm-delete-code" data-code="<?php echo esc_attr($code); ?>" <?php echo $usage > 0 ? 'disabled title="Cannot delete code with existing redemptions"' : ''; ?> style="width: 100%;">
+                                <span class="dashicons dashicons-trash" style="font-size: 14px; width: 14px; height: 14px;"></span>
+                                Delete
+                            </button>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -447,9 +531,12 @@ function render_admin_page()
             </div>
         </div>
 
-        <form method="post" action="options.php">
+        <form method="post" action="options.php" id="hpm-settings-form">
             <?php settings_fields('hpm_settings_group');
             do_settings_sections('hpm_settings_group'); ?>
+            
+            <!-- Code assignment mode hidden field -->
+            <input type="hidden" id="hpm-mode-field" name="home_promo_manager_settings[code_assignment_mode]" value="<?php echo esc_attr($current_mode); ?>" />
             
             <!-- Dynamic codes as hidden fields -->
             <?php foreach ($promo_codes as $code => $config): ?>
@@ -585,101 +672,203 @@ function render_admin_page()
         </div>
 
         <script>
-        // Add Code Button Functionality
-        document.getElementById('hpm-add-code-btn')?.addEventListener('click', function() {
-            const codeName = document.getElementById('hpm_new_code_name').value.trim().toUpperCase();
-            const codeDesc = document.getElementById('hpm_new_code_desc').value.trim();
-            const codeMax = parseInt(document.getElementById('hpm_new_code_max').value) || 50;
-
-            // Validation
-            if (!codeName) {
-                alert('Please enter a code name');
-                return;
-            }
-
-            // Check code format (alphanumeric + hyphens only)
-            if (!/^[A-Z0-9\-]+$/i.test(codeName)) {
-                alert('Code name can only contain letters, numbers, and hyphens');
-                return;
-            }
-
-            // Check for duplicate
-            const existingCodes = document.querySelectorAll('[name*="[promo_codes]["]');
-            let duplicate = false;
-            existingCodes.forEach(el => {
-                if (el.name.includes('[promo_codes][' + codeName + ']')) {
-                    duplicate = true;
-                }
-            });
-
-            if (duplicate) {
-                alert('Code "' + codeName + '" already exists!');
-                return;
-            }
-
-            // Get the form
-            const form = document.querySelector('form[action="options.php"]');
-            const hiddenContainer = form.querySelector('tbody');
-
-            // Create hidden fields for new code
-            const inputs = [
-                {name: 'home_promo_manager_settings[promo_codes][' + codeName + '][max]', value: codeMax},
-                {name: 'home_promo_manager_settings[promo_codes][' + codeName + '][description]', value: codeDesc},
-                {name: 'home_promo_manager_settings[promo_codes][' + codeName + '][active]', value: '1'}
-            ];
-
-            inputs.forEach(inp => {
-                const hidden = document.createElement('input');
-                hidden.type = 'hidden';
-                hidden.name = inp.name;
-                hidden.value = inp.value;
-                form.appendChild(hidden);
-            });
-
-            // Add row to visible table
-            const tbody = document.querySelector('.hpm-code-stats tbody');
-            const newRow = tbody.insertRow();
-            newRow.style.backgroundColor = '#fffbcc'; // Highlight new row
-            newRow.innerHTML = `
-                <td><strong>${codeName}</strong> <span style="color: #d63638; font-size: 11px;">⚠ PENDING</span></td>
-                <td>${codeDesc}</td>
-                <td>0 / ${codeMax}</td>
-                <td>${codeMax}</td>
-                <td>
-                    <div style="background: #e0e0e0; height: 20px; border-radius: 3px; overflow: hidden;">
-                        <div style="width: 0%; background: #46b450; height: 100%; transition: width 0.3s;"></div>
-                    </div>
-                </td>
-                <td><span style="color: #d63638; font-weight: bold;">⚠ PENDING SAVE - Not active yet!</span></td>
-            `;
-
-            // Clear form
-            document.getElementById('hpm_new_code_name').value = '';
-            document.getElementById('hpm_new_code_desc').value = '';
-            document.getElementById('hpm_new_code_max').value = '50';
-
-            alert('Code "' + codeName + '" added to form!\n\n⚠ IMPORTANT: This code is NOT active yet.\nScroll down and click "Save Settings" to activate it.');
-        });
-
-        // Toggle Mode Functionality
-        document.querySelectorAll('.hpm-mode-toggle-btn').forEach(btn => {
-            btn.addEventListener('click', function(e) {
+        jQuery(document).ready(function($) {
+            // Toggle Mode Functionality - FIXED
+            $('.hpm-mode-toggle-btn').on('click', function(e) {
                 e.preventDefault();
-                const mode = this.getAttribute('data-toggle-mode');
-                const hiddenField = document.querySelector('[name="home_promo_manager_settings[code_assignment_mode]"]');
-                if (hiddenField && mode) {
-                    hiddenField.value = mode;
+                const mode = $(this).data('toggle-mode');
+                const hiddenField = $('#hpm-mode-field');
+                
+                if (hiddenField.length && mode) {
+                    hiddenField.val(mode);
                     const msg = mode === 'auto' ? 
-                        'Mode will change to Auto-Assign (Legacy) when you click "Save Settings".' :
-                        'Mode will change to SMART26 (User-Entered Codes) when you click "Save Settings".';
-                    alert(msg + '\n\nCurrent hidden field value: ' + mode + '\n\nMake sure to scroll down and click "Save Settings" to persist this change.');
-                    console.log('[HPM] Mode toggled to:', mode);
-                    // Auto-submit the form to save immediately
-                    if (confirm('Do you want to save this change now?')) {
-                        document.querySelector('form').submit();
+                        'Switch to Auto-Assign (Legacy) mode?' :
+                        'Switch to SMART26 (User-Entered Codes) mode?';
+                    
+                    if (confirm(msg + '\n\nClick OK to save and reload the page.')) {
+                        $('#hpm-settings-form').submit();
                     }
                 }
             });
+
+            // Add Code Button Functionality
+            $('#hpm-add-code-btn').on('click', function() {
+                const codeName = $('#hpm_new_code_name').val().trim().toUpperCase();
+                const codeDesc = $('#hpm_new_code_desc').val().trim();
+                const codeMax = parseInt($('#hpm_new_code_max').val()) || 50;
+
+                if (!codeName) {
+                    alert('Please enter a code name');
+                    return;
+                }
+
+                if (!/^[A-Z0-9\-]+$/i.test(codeName)) {
+                    alert('Code name can only contain letters, numbers, and hyphens');
+                    return;
+                }
+
+                // Check for duplicate
+                if ($('[name*="[promo_codes][' + codeName + ']"]').length > 0) {
+                    alert('Code "' + codeName + '" already exists!');
+                    return;
+                }
+
+                // Create hidden fields for new code
+                const form = $('#hpm-settings-form');
+                $('<input>').attr({
+                    type: 'hidden',
+                    name: 'home_promo_manager_settings[promo_codes][' + codeName + '][max]',
+                    value: codeMax
+                }).appendTo(form);
+                $('<input>').attr({
+                    type: 'hidden',
+                    name: 'home_promo_manager_settings[promo_codes][' + codeName + '][description]',
+                    value: codeDesc
+                }).appendTo(form);
+                $('<input>').attr({
+                    type: 'hidden',
+                    name: 'home_promo_manager_settings[promo_codes][' + codeName + '][active]',
+                    value: '1'
+                }).appendTo(form);
+
+                // Add row to visible table
+                const newRow = `
+                    <tr data-code="${codeName}" style="background: #fffbcc;">
+                        <td><strong>${codeName}</strong> <span style="color: #d63638; font-size: 11px;">⚠ PENDING</span></td>
+                        <td>${codeDesc}</td>
+                        <td class="code-used">0</td>
+                        <td>${codeMax}</td>
+                        <td class="code-remaining"><strong>${codeMax}</strong></td>
+                        <td>
+                            <div style="background: #f0f0f1; height: 24px; border-radius: 12px; overflow: hidden;">
+                                <div class="code-progress-bar" style="background: #00a32a; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                            </div>
+                            <small class="code-percentage">0.0%</small>
+                        </td>
+                        <td>
+                            <span class="dashicons dashicons-yes-alt" style="color: #00a32a;"></span>
+                            <strong style="color: #d63638;">PENDING SAVE</strong>
+                        </td>
+                        <td>
+                            <button type="button" class="button button-small" disabled>⚠ Save First</button>
+                        </td>
+                    </tr>
+                `;
+                $('#hpm-codes-list').append(newRow);
+
+                // Clear form
+                $('#hpm_new_code_name').val('');
+                $('#hpm_new_code_desc').val('');
+                $('#hpm_new_code_max').val('50');
+
+                alert('Code "' + codeName + '" added!\n\n⚠ Click "Save Settings" below to activate it.');
+            });
+
+            // Toggle Code Active/Inactive
+            $(document).on('click', '.hpm-toggle-code', function() {
+                const code = $(this).data('code');
+                const currentActive = $(this).data('active') === '1' || $(this).data('active') === 1;
+                const newActive = !currentActive;
+                
+                // Update hidden field
+                $('[name="home_promo_manager_settings[promo_codes][' + code + '][active]"]').val(newActive ? '1' : '0');
+                
+                // Update button state
+                $(this).data('active', newActive ? '1' : '0');
+                $(this).find('.dashicons').removeClass('dashicons-visibility dashicons-hidden')
+                    .addClass(newActive ? 'dashicons-visibility' : 'dashicons-hidden');
+                $(this).html(
+                    '<span class="dashicons dashicons-' + (newActive ? 'visibility' : 'hidden') + '" style="font-size: 14px; width: 14px; height: 14px;"></span> ' +
+                    (newActive ? 'Deactivate' : 'Activate')
+                );
+                
+                // Update status column
+                const row = $(this).closest('tr');
+                const statusCell = row.find('td:nth-child(7)');
+                statusCell.html(
+                    '<span class="dashicons dashicons-' + (newActive ? 'yes-alt' : 'archive') + '" style="color: ' + (newActive ? '#00a32a' : '#dba617') + ';"></span>' +
+                    '<strong style="color: ' + (newActive ? '#00a32a' : '#dba617') + ';">' + (newActive ? 'Active' : 'Inactive') + '</strong>'
+                );
+                
+                alert('Code "' + code + '" will be ' + (newActive ? 'activated' : 'deactivated') + ' when you click "Save Settings".');
+            });
+
+            // Delete Code
+            $(document).on('click', '.hpm-delete-code', function() {
+                if ($(this).prop('disabled')) {
+                    alert('Cannot delete codes that have existing redemptions.\n\nDeactivate the code instead to prevent new registrations.');
+                    return;
+                }
+                
+                const code = $(this).data('code');
+                
+                if (!confirm('Delete code "' + code + '"?\n\nThis action cannot be undone.')) {
+                    return;
+                }
+                
+                // Remove hidden fields
+                $('[name^="home_promo_manager_settings[promo_codes][' + code + ']"]').remove();
+                
+                // Remove table row
+                $(this).closest('tr').fadeOut(300, function() {
+                    $(this).remove();
+                });
+                
+                alert('Code "' + code + '" removed!\n\nClick "Save Settings" to persist this change.');
+            });
+
+            // Realtime Stats Update (every 5 seconds)
+            let realtimeUpdateInterval;
+            
+            function updateRealtimeStats() {
+                $.ajax({
+                    url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                    type: 'POST',
+                    data: {
+                        action: 'hpm_get_realtime_stats'
+                    },
+                    success: function(response) {
+                        if (response.success && response.data) {
+                            const stats = response.data;
+                            
+                            // Update each code row
+                            $.each(stats.codes, function(code, data) {
+                                const row = $('tr[data-code="' + code + '"]');
+                                if (row.length) {
+                                    row.find('.code-used').text(data.used);
+                                    row.find('.code-remaining strong').text(data.remaining);
+                                    row.find('.code-percentage').text(data.percentage.toFixed(1) + '%');
+                                    
+                                    // Update progress bar
+                                    const bar = row.find('.code-progress-bar');
+                                    bar.css('width', data.percentage + '%');
+                                    
+                                    // Update bar color
+                                    let color = '#00a32a';
+                                    if (data.percentage >= 100) color = '#d63638';
+                                    else if (data.percentage >= 80) color = '#dba617';
+                                    bar.css('background', color);
+                                }
+                            });
+                            
+                            // Update dashboard if present
+                            if (stats.total) {
+                                $('.hpm-dashboard .hpm-card:nth-child(2) .hpm-stat').text(stats.total.used + ' / ' + stats.total.max);
+                                $('.hpm-dashboard .hpm-card:nth-child(2) .hpm-bar').css('width', stats.total.percentage + '%');
+                            }
+                        }
+                    },
+                    error: function() {
+                        console.log('[HPM] Realtime update failed');
+                    }
+                });
+            }
+            
+            // Start realtime updates
+            realtimeUpdateInterval = setInterval(updateRealtimeStats, 5000);
+            
+            // Initial update
+            setTimeout(updateRealtimeStats, 1000);
         });
         </script>
         <?php

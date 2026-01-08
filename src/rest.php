@@ -52,31 +52,46 @@ add_action('rest_api_init', function () {
                 ]);
             } else {
                 // SMART26 mode: per-code stats
-                $code_stats = DB::get_code_stats();
+                $code_stats_array = DB::get_code_stats();
                 $category_stats = DB::get_category_stats();
                 $promo_codes = $mgr->s('promo_codes') ?: [];
+
+                // Convert to associative map for easier lookup
+                $code_usage_map = [];
+                foreach ($code_stats_array as $stat) {
+                    $code_usage_map[$stat['promo_code']] = (int) $stat['count'];
+                }
 
                 // Build per-code breakdown
                 $codes_data = [];
                 $total_used = 0;
                 $total_max = 0;
+                $current_code = null;
+                $current_remaining = 0;
 
                 foreach ($promo_codes as $code => $config) {
                     if (!($config['active'] ?? true)) {
                         continue; // Skip inactive codes
                     }
 
-                    $used = isset($code_stats[$code]) ? (int) $code_stats[$code]['count'] : 0;
+                    $used = $code_usage_map[$code] ?? 0;
                     $max = (int) ($config['max'] ?? 0);
+                    $remaining = max(0, $max - $used);
                     $total_used += $used;
                     $total_max += $max;
+
+                    // Find first available code (for current_code backward compatibility)
+                    if ($remaining > 0 && $current_code === null) {
+                        $current_code = $code;
+                        $current_remaining = $remaining;
+                    }
 
                     $codes_data[] = [
                         'code' => $code,
                         'description' => $config['description'] ?? '',
                         'used' => $used,
                         'max' => $max,
-                        'remaining' => max(0, $max - $used),
+                        'remaining' => $remaining,
                         'percentage' => $max > 0 ? round(($used / $max) * 100, 1) : 0,
                     ];
                 }
@@ -87,12 +102,15 @@ add_action('rest_api_init', function () {
                     $categories_data[$cat] = (int) $count;
                 }
 
+                // Backward compatible response for promo page
                 return rest_ensure_response([
                     'active' => true,
                     'mode' => 'smart26',
+                    'current_code' => $current_code ?: '-', // First available code
+                    'remaining_tier' => $current_remaining, // Remaining for current code
+                    'remaining_total' => max(0, $total_max - $total_used), // Total remaining
                     'total_used' => $total_used,
                     'total_max' => $total_max,
-                    'total_remaining' => max(0, $total_max - $total_used),
                     'codes' => $codes_data,
                     'categories' => $categories_data,
                     'end_time' => intval($end_utc),
