@@ -1,599 +1,200 @@
-<?php // Template Name: Promo Countdown 12.12 (Mobile Optimized)
-// --- CONFIGURATION ---
-$bg_blue = '#5acdf8';
-$green = '#62be4d';
-$pink = '#ff1a8c';
+<?php // Template Name: SMART 26 Promo (Animated & Fixed)
+$bg_purple = '#510E7E';
+$yellow    = '#FFD231';
+$lime      = '#48BC13';
 
 $api_url = get_rest_url(null, 'promo/v1/counter');
 
-// Server-side time calculation for immediate clock rendering
 $server_target_ts = 0;
 if (class_exists('\HPM\Manager')) {
     $mgr = \HPM\Manager::get_instance();
     try {
         $tz_string = $mgr->s('timezone') ?: 'Asia/Kuala_Lumpur';
-        try {
-            $tz = new \DateTimeZone($tz_string);
-        } catch (\Exception $e) {
-            $tz = new \DateTimeZone('Asia/Kuala_Lumpur');
-        }
+        $tz = new \DateTimeZone($tz_string);
         $end_dt = new \DateTimeImmutable($mgr->s('end'), $tz);
         $server_target_ts = $end_dt->setTimezone(new \DateTimeZone('UTC'))->getTimestamp() * 1000;
-    } catch (\Exception $e) {
-        $server_target_ts = 0;
-    }
+    } catch (\Exception $e) { $server_target_ts = 0; }
 }
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
-
 <head>
     <meta charset="<?php bloginfo('charset'); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php the_title(); ?> – 12.12 Promo</title>
-    <link rel="icon" href="data:,">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Fredoka:wght@600;700&family=Modak&display=swap"
-        rel="stylesheet">
-    <!-- Note: Tailwind is vendored locally for reliability. -->
+    <title>SMART 26 – Promo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="<?= HOME_PROMO_MANAGER_URL ?>assets/js/tailwindcss.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: {
-                        brandblue: '<?= $bg_blue ?>',
-                        brandgreen: '<?= $green ?>',
-                        brandpink: '<?= $pink ?>',
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        display: ['Fredoka', 'sans-serif'],
-                        mono: ['Modak', 'cursive'],
-                    }
+                    colors: { brandpurple: '<?= $bg_purple ?>', brandyellow: '<?= $yellow ?>', brandlime: '<?= $lime ?>' },
+                    borderRadius: { 'mega': '50px' }
                 }
             }
         }
     </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
+        :root { --p: <?= $bg_purple ?>; --y: <?= $yellow ?>; }
+        
         body {
-            background:
-                <?= $bg_blue ?>
-            ;
-            min-height: 100vh;
-            font-family: 'Inter', sans-serif;
+            background-color: var(--p);
+            background-image: 
+                radial-gradient(circle at center, #6a1ba3 0%, var(--p) 100%);
+            height: 100vh;
             margin: 0;
-            overflow-x: hidden;
-            /* Critical Fallback CSS */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        main {
-            width: 100%;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            font-family: 'Inter', sans-serif;
+            position: relative;
         }
 
-        /* Clouds (kept exactly the same) */
-        #background-wrap {
+        /* Mobile scaling */
+        @media (max-width: 640px) {
+            body {
+                justify-content: flex-start;
+                padding-top: 1rem;
+            }
+        }
+
+        /* Diagonal lines overlay */
+        body::before {
+            content: "";
             position: fixed;
             inset: 0;
-            z-index: -1;
-            padding-top: 50px;
+            background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.03) 50%, rgba(255, 255, 255, 0.03) 75%, transparent 75%, transparent);
+            background-size: 30px 30px;
             pointer-events: none;
+            z-index: 0;
         }
 
-        @keyframes animateCloud {
-            from {
-                margin-left: -1000px;
-            }
-
-            to {
-                margin-left: 100%;
-            }
+        .ribbon-banner {
+            background: white;
+            transform: rotate(-3deg);
+            box-shadow: 10px 10px 0px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+        }
+        .ribbon-banner:hover {
+            transform: rotate(-1deg) scale(1.02);
+            box-shadow: 15px 15px 0px rgba(0,0,0,0.1);
         }
 
-        .x1 {
-            animation: animateCloud 35s linear infinite;
-            transform: scale(0.65);
+        .cta-dud {
+            background: var(--y);
+            clip-path: polygon(0% 0%, 100% 0%, 95% 50%, 100% 100%, 0% 100%, 5% 50%);
+            padding: 12px 40px;
+            animation: breathe 3s ease-in-out infinite;
+            cursor: default;
         }
-
-        .x2 {
-            animation: animateCloud 20s linear infinite;
-            transform: scale(0.3);
-        }
-
-        .x3 {
-            animation: animateCloud 30s linear infinite;
-            transform: scale(0.5);
-        }
-
-        .x4 {
-            animation: animateCloud 18s linear infinite;
-            transform: scale(0.4);
-        }
-
-        .x5 {
-            animation: animateCloud 25s linear infinite;
-            transform: scale(0.55);
-        }
-
-        .cloud {
-            background: #fff;
-            border-radius: 100px;
-            box-shadow: 0 8px 5px rgba(0, 0, 0, 0.1);
-            height: 120px;
-            width: 350px;
-            position: relative;
-        }
-
-        .cloud:after,
-        .cloud:before {
-            content: '';
-            background: #fff;
-            position: absolute;
-        }
-
-        .cloud:after {
-            border-radius: 100px;
-            width: 100px;
-            height: 100px;
-            top: -50px;
-            left: 50px;
-        }
-
-        .cloud:before {
-            border-radius: 200px;
-            width: 180px;
-            height: 180px;
-            top: -90px;
-            right: 50px;
-        }
-
-        /* Big stacked title */
-        .big-title {
-            font-family: 'Fredoka', sans-serif;
-            font-weight: 700;
-            line-height: 0.92;
-            text-align: center;
-            position: relative;
-        }
-
-
-
-        /* 12.12 – Pink with super thick white stroke */
-        .big-title .number {
-            font-family: 'Modak', cursive;
-            font-size: clamp(5.5rem, 22vw, 13rem);
-            color: <?= $pink ?>;
-            text-shadow: 
-                -5.5px -5.5px 0 white, 5.5px -5.5px 0 white, -5.5px 5.5px 0 white, 5.5px 5.5px 0 white,
-                -5.5px 0 0 white, 5.5px 0 0 white, 0 -5.5px 0 white, 0 5.5px 0 white;
-            -webkit-text-stroke: 3.5px white;
-            margin: -20px 0 -10px;
-        }
-
-        /* OZEM DEALS – Pink */
-        .big-title .ozem {
-            font-size: clamp(2.8rem, 9vw, 5.5rem);
-            color: <?= $pink ?>;
-            text-shadow: 
-                -5px -5px 0 white, 5px -5px 0 white, -5px 5px 0 white, 5px 5px 0 white,
-                -5px 0 0 white, 5px 0 0 white, 0 -5px 0 white, 0 5px 0 white;
-        }
-
-        /* Mobile optimization for stroke/shadow */
+        
         @media (max-width: 640px) {
-            .big-title .number {
-                text-shadow: 
-                    -3px -3px 0 white, 3px -3px 0 white, -3px 3px 0 white, 3px 3px 0 white,
-                    -3px 0 0 white, 3px 0 0 white, 0 -3px 0 white, 0 3px 0 white;
-                -webkit-text-stroke: 2px white;
-            }
-            .big-title .ozem {
-                text-shadow: 
-                    -3px -3px 0 white, 3px -3px 0 white, -3px 3px 0 white, 3px 3px 0 white,
-                    -3px 0 0 white, 3px 0 0 white, 0 -3px 0 white, 0 3px 0 white;
+            .cta-dud {
+                padding: 10px 30px;
             }
         }
 
-        /* Clock – fixed & responsive */
-        .flip-clock {
-            display: flex;
-            justify-content: center;
-            gap: 0.75rem;
-            margin: 1.5rem 0;
-        }
-
-        .flip-unit {
-            width: 68px;
-            height: 88px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-
-            @media (min-width: 480px) {
-                width: 84px;
-                height: 110px;
-            }
+        @keyframes breathe {
+            0%, 100% { transform: scale(1); filter: brightness(1); }
+            50% { transform: scale(1.05); filter: brightness(1.1); }
         }
 
         .flip-digit {
-            background: #fff;
-            color:
-                <?= $bg_blue ?>
-            ;
-            font-weight: 800;
-            font-size: 3.2rem;
-            border-radius: 16px;
-            box-shadow: 0 6px 0 rgba(0, 0, 0, 0.15);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            width: 100%;
-        }
-
-        @media (max-width: 480px) {
-            .flip-digit {
-                font-size: 2.4rem;
-                border-radius: 12px;
-            }
-        }
-
-        .flip-label {
-            color: white;
-            font-size: 0.65rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-            margin-top: 0.25rem;
-        }
-
-        /* Live stats – side by side on bigger screens */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem;
-            width: 100%;
-            max-width: 600px;
-            margin: 1.5rem auto;
-        }
-
-        @media (min-width: 540px) {
-            .stats-grid {
-                gap: 1.5rem;
-            }
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 16px;
-            padding: 0.75rem;
-            text-align: center;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-        }
-
-        .stat-card.code {
-            border: 4px dashed
-                <?= $pink ?>
-            ;
-            background: #fff5fb;
-            transform: rotate(-2deg);
-        }
-
-        .stat-card.code:hover {
-            transform: rotate(0) scale(1.03);
-        }
-
-        .final-price {
-            font-family: 'Fredoka', sans-serif;
-            font-size: clamp(2rem, 5vw, 2.8rem);
-            font-weight: 700;
-            color:
-                <?= $green ?>
-            ;
             background: white;
-            padding: 8px 16px;
+            color: var(--p);
             border-radius: 12px;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
-            margin: 0.5rem 0;
+            box-shadow: 0 4px 0px #ccc;
+            transition: transform 0.2s;
+        }
+        .flip-digit:hover { transform: translateY(-5px); }
+
+        .bolt-pulse {
+            display: inline-block;
+            animation: pulseBolt 1.5s infinite;
+        }
+        @keyframes pulseBolt {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
         }
 
-        .stat-value-slots {
-            font-family: 'Fredoka', sans-serif;
-            font-size: clamp(3rem, 8vw, 4.5rem);
-            color:
-                <?= $green ?>
-            ;
-            font-weight: 700;
-            line-height: 1;
-        }
-
-        .pill-discount {
-            background: white;
-            color:
-                <?= $green ?>
-            ;
-            font-weight: 800;
-            font-size: clamp(1.4rem, 4vw, 2rem);
-            padding: 0.75rem 2rem;
-            border-radius: 999px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        .footer-strip {
-            background: white;
-            padding: 1.5rem;
-            text-align: center;
-            font-size: 0.9rem;
-            color: #64748b;
-            font-weight: 500;
-            margin-top: auto;
-            width: 100%;
+        /* Mobile-specific adjustments */
+        @media (max-width: 640px) {
+            .mobile-compact { margin-bottom: 0.75rem !important; }
+            .mobile-compact-sm { margin-bottom: 0.5rem !important; }
         }
     </style>
 </head>
 
-<body class="flex flex-col min-h-screen">
+<body class="flex flex-col items-center">
 
-    <!-- Clouds Background -->
-    <div id="background-wrap">
-        <div class="x1">
-            <div class="cloud"></div>
-        </div>
-        <div class="x2">
-            <div class="cloud"></div>
-        </div>
-        <div class="x3">
-            <div class="cloud"></div>
-        </div>
-        <div class="x4">
-            <div class="cloud"></div>
-        </div>
-        <div class="x5">
-            <div class="cloud"></div>
+    <div class="absolute top-0 left-0 z-20 animate__animated animate__fadeInDown">
+        <div class="bg-white py-2 px-4 sm:py-4 sm:px-6 rounded-br-mega shadow-2xl transition-transform hover:scale-105">
+            <img src="https://home.edu.my/sistemklon/oalsumte/2026/01/LOGO-HOME-AI-2-01.png" 
+                 alt="HOME Logo" 
+                 class="w-16 sm:w-24 md:w-28 h-auto object-contain">
         </div>
     </div>
 
-    <main class="flex-grow flex flex-col items-center justify-center px-4 py-8 relative z-10">
-        <div class="text-center max-w-4xl w-full">
+    <main class="w-full max-w-lg px-4 sm:px-6 flex flex-col items-center z-10 text-center">
+        
+        <h2 class="text-white font-bold tracking-[0.3em] text-[8px] sm:text-[9px] mb-1 uppercase animate__animated animate__fadeIn animate__delay-1s">
+            Terapi Matematik
+        </h2>
+        
+        <h1 class="text-4xl sm:text-5xl md:text-6xl font-black text-brandyellow italic tracking-tighter drop-shadow-2xl mb-2 leading-none animate__animated animate__zoomIn">
+            PROMO <span class="not-italic text-2xl sm:text-3xl bolt-pulse">⚡</span>
+        </h1>
 
-            <!-- BIG TITLE -->
-            <div class="big-title mb-4">
-                <div class="number">12.12</div>
-                <div class="ozem">OZEM DEALS</div>
-            </div>
-
-            <div class="pill-discount">POTONGAN DISKAUN SEHINGGA 24%</div>
-
-            <p class="text-white font-semibold text-lg mt-4 max-w-lg mx-auto leading-relaxed drop-shadow-md">
-                Promosi terhad kepada <span class="text-pink-300">480 pendaftaran terawal sahaja</span>.<br>
-                Jangan lepaskan peluang anda!
-            </p>
-
-            <!-- COUNTDOWN CLOCK -->
-            <!-- COUNTDOWN CLOCK -->
-            <div class="flip-clock" id="flipClock"></div>
-
-            <!-- LIVE STATS (side-by-side on ≥540px) -->
-            <div class="stats-grid" id="liveStats" style="opacity:0;">
-                <div class="stat-card code">
-                    <div id="priceDisplay" class="text-center"></div>
-                </div>
-                <div class="stat-card text-center">
-                    <div class="text-sm font-bold text-gray-600 uppercase">Kekosongan (Tier Ini)</div>
-                    <div id="apiSlots" class="stat-value-slots">...</div>
-                    <div class="text-xs text-gray-600 mt-2">Baki Keseluruhan: <span id="apiTotal">...</span></div>
-                </div>
-            </div>
-
-            <div class="bg-white text-pink-600 font-bold py-3 px-8 rounded-xl shadow-lg text-lg mt-6 inline-block">
-                12 - 24 Disember 2025
-            </div>
-
-            <p class="text-white/80 text-sm mt-4">*Terma & Syarat*</p>
+        <div class="ribbon-banner w-[110%] -ml-[5%] px-3 py-1.5 sm:px-4 sm:py-2 mb-3 sm:mb-4 flex justify-center animate__animated animate__fadeInLeft animate__delay-1s">
+            <span class="text-3xl sm:text-4xl md:text-5xl font-black text-[#9D8BB1] tracking-tighter leading-none uppercase">Smart 26</span>
         </div>
+
+        <div class="bg-brandpurple border-2 border-white px-3 py-1 sm:px-4 sm:py-1.5 rotate-[-3deg] mb-3 sm:mb-4 shadow-lg animate__animated animate__fadeInRight animate__delay-1s">
+            <span class="text-brandyellow font-bold text-[9px] sm:text-[10px] tracking-widest uppercase">Potongan Sehingga 26%</span>
+        </div>
+
+        <div class="flex gap-1.5 sm:gap-2 md:gap-3 mb-3 sm:mb-4 animate__animated animate__fadeInUp animate__delay-2s" id="flipClock"></div>
+
+        <div class="grid grid-cols-2 gap-2 sm:gap-3 w-full opacity-0 transition-all duration-700 transform translate-y-4 max-w-sm mb-3 sm:mb-4" id="liveStats">
+            <div class="bg-brandpurple/40 border-2 border-brandyellow p-2 sm:p-2.5 rounded-2xl flex flex-col justify-center items-center shadow-lg backdrop-blur-md hover:border-white transition-colors">
+                <div id="priceDisplay"></div>
+            </div>
+            <div class="bg-white p-2 sm:p-2.5 rounded-2xl text-brandpurple shadow-lg flex flex-col justify-center transition-transform hover:scale-95">
+                <div class="text-[7px] sm:text-[8px] font-bold uppercase opacity-60">Kekosongan Tier</div>
+                <div id="apiSlots" class="text-3xl sm:text-4xl font-black leading-none my-1">...</div>
+                <div class="text-[7px] sm:text-[8px] font-bold bg-brandpurple/10 px-2 py-0.5 rounded-full uppercase">Total: <span id="apiTotal">...</span></div>
+            </div>
+        </div>
+
+        <div class="bg-brandlime text-white font-black text-sm sm:text-base px-6 sm:px-8 py-2.5 sm:py-3 rounded-full shadow-2xl mb-3 sm:mb-4 animate__animated animate__pulse animate__infinite">
+            12 - 14 JANUARI 2026
+        </div>
+
+        <p class="text-white text-[11px] sm:text-xs leading-relaxed font-medium mb-3 sm:mb-4 animate__animated animate__fadeIn animate__delay-3s px-2">
+            Promosi terbuka kepada <span class="text-brandyellow italic font-black text-xs sm:text-sm underline decoration-brandlime">pendaftaran baru</span>.<br>
+            Jangan lepaskan peluang anda!
+        </p>
+
+        <div class="mb-2 sm:mb-3 cta-dud animate__animated animate__fadeInUp animate__delay-4s">
+            <span class="text-brandpurple font-black text-base sm:text-lg md:text-xl tracking-tighter">DAFTAR SEKARANG</span>
+        </div>
+
+        <a href="https://www.home.edu.my" class="text-brandyellow/60 text-[8px] sm:text-[9px] font-bold tracking-[0.4em] hover:text-white transition-all uppercase">WWW.HOME.EDU.MY</a>
+
     </main>
 
-    <footer class="footer-strip">
-        Home Maths Therapy © <?= date('Y') ?> • Powered by QCXIS Sdn Bhd
-    </footer>
-
-    <!-- Same modal & confetti as before (unchanged) -->
-    <!-- ... (copy-paste your existing modal + confetti div) ... -->
-
-    <script>
-        const API_ENDPOINT = "<?= $api_url ?>";
-        let targetTs = <?= $server_target_ts ?>;
-        const ORIGINAL_PRICE = 200.00;
-        const PRICE_FORMAT = new Intl.NumberFormat('en-MY', { style: 'currency', currency: 'MYR', minimumFractionDigits: 2 });
-
-        function pad(n) { return n < 10 ? '0' + n : n; }
-
-        function calculatePriceDisplay(code) {
-            let rate = 0;
-            if (code && (code.includes('24') || code.includes('25'))) rate = 0.24;
-            else if (code && (code.includes('12') || code.includes('10'))) rate = 0.12;
-
-            const discount = ORIGINAL_PRICE * rate;
-            const final = ORIGINAL_PRICE - discount;
-            return {
-                percent: Math.round(rate * 100),
-                original: PRICE_FORMAT.format(ORIGINAL_PRICE),
-                discount: PRICE_FORMAT.format(discount),
-                final: PRICE_FORMAT.format(final),
-                code: code || '-'
-            };
-        }
-
-        async function updateRealtimeStats() {
-            try {
-                const res = await fetch(API_ENDPOINT);
-                const d = await res.json();
-
-                if (!d.active || d.remaining_total <= 0) {
-                    document.getElementById('liveStats').style.opacity = '1';
-                    document.getElementById('priceDisplay').innerHTML = `<div class="text-xl font-bold text-gray-500">PROMOSI TAMAT / SOLD OUT</div><div class="final-price text-3xl">${PRICE_FORMAT.format(ORIGINAL_PRICE)}</div>`;
-                    document.getElementById('apiSlots').innerText = "0";
-                    return;
-                }
-
-                const p = calculatePriceDisplay(d.current_code);
-                document.getElementById('priceDisplay').innerHTML = `
-                    <div class="text-sm text-gray-600 line-through">${p.original}</div>
-                    <div class="bg-rose-600 text-white px-3 py-1 rounded text-sm font-bold my-2">JIMAT ${p.percent}% !</div>
-                    <div class="final-price">${p.final}</div>
-                    <div class="text-xs mt-2 text-gray-600">Kod: ${p.code}</div>
-                `;
-
-                document.getElementById('apiSlots').innerText = d.remaining_tier;
-                document.getElementById('apiTotal').innerText = d.remaining_total;
-
-                if (d.remaining_tier < 10) document.getElementById('apiSlots').classList.add('animate-pulse');
-                else document.getElementById('apiSlots').classList.remove('animate-pulse');
-
-                if (d.end_time) targetTs = d.end_time * 1000;
-                document.getElementById('liveStats').style.opacity = '1';
-            } catch (e) { console.error(e); }
-        }
-
-        // Clock
-        let last = [-1, -1, -1, -1];
-        const labels = ['Hari', 'Jam', 'Minit', 'Saat'];
-        function render(parts) {
-            let html = '';
-            parts.forEach((v, i) => {
-                const anim = last[i] !== -1 && last[i] !== v;
-                html += `<div class="flip-unit">
-                    <div class="flip-digit${anim ? ' animate__animated animate__flipInY' : ''}">${pad(v)}</div>
-                    <div class="flip-label">${labels[i]}</div>
-                </div>`;
-            });
-            document.getElementById('flipClock').innerHTML = html;
-            last = [...parts];
-        }
-
-        function tick() {
-            if (!targetTs) return;
-            let diff = Math.max(targetTs - Date.now(), 0);
-            let d = Math.floor(diff / 86400000);
-            let h = Math.floor(diff % 86400000 / 3600000);
-            let m = Math.floor(diff % 3600000 / 60000);
-            let s = Math.floor(diff % 60000 / 1000);
-            render([d, h, m, s]);
-        }
-
-        // Init
-        setInterval(tick, 1000);
-        tick();
-        updateRealtimeStats();
-        setInterval(updateRealtimeStats, 3000);
-
-        // --- ACTIONS ---
-        function showCelebration() {
-            document.getElementById('confettiBg').style.display = 'block';
-
-            setTimeout(() => {
-                document.getElementById('confettiBg').style.display = 'none';
-            }
-
-                , 3000);
-
-            confetti({
-                particleCount: 180, spread: 100, origin: {
-                    y: 0.83
-                }
-
-                , colors: ['#5acdf8', '#ff1a8c', '#fff', '#62be4d']
-            });
-        }
-
-        // --- PROMO POPUP LOGIC ---
-        function getCookie(name) {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; ${name}=`);
-            if (parts.length === 2) return parts.pop().split(';').shift();
-        }
-
-        function checkPromoEligibility() {
-            const promoCode = getCookie('hpm_promo_eligible');
-            if (promoCode) {
-                const modal = document.getElementById('promoSuccessModal');
-                const backdrop = document.getElementById('modalBackdrop');
-                const content = document.getElementById('modalContent');
-                const codeEl = document.getElementById('modalPromoCode');
-
-                if (modal && codeEl) {
-                    // Set code
-                    codeEl.innerText = promoCode;
-
-                    // Show modal
-                    modal.classList.remove('hidden');
-
-                    // Animate in
-                    requestAnimationFrame(() => {
-                        backdrop.classList.remove('opacity-0');
-                        content.classList.remove('scale-95', 'opacity-0');
-                        content.classList.add('scale-100', 'opacity-100');
-                    });
-
-                    // Trigger confetti
-                    showCelebration();
-
-                    // Clear cookie
-                    document.cookie = "hpm_promo_eligible=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-                }
-            }
-        }
-
-        function closePromoModal() {
-            const modal = document.getElementById('promoSuccessModal');
-            const backdrop = document.getElementById('modalBackdrop');
-            const content = document.getElementById('modalContent');
-
-            backdrop.classList.add('opacity-0');
-            content.classList.remove('scale-100', 'opacity-100');
-            content.classList.add('scale-95', 'opacity-0');
-
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300);
-        }
-
-        // Check on load
-        window.addEventListener('load', checkPromoEligibility);
-
-        // Check periodically (fallback)
-        setInterval(checkPromoEligibility, 2000);
-
-    </script>
-
-    <!-- Footer -->
-    <footer class="bg-gray-900 text-gray-400 py-8 mt-16">
-        <div class="max-w-4xl mx-auto px-4 text-center">
-            <p class="text-sm mb-2">
-                &copy; 2026 <span class="text-white font-semibold">HOME Math Therapy</span>. All rights reserved.
-            </p>
-            <p class="text-xs">
-                Powered by <a href="https://qcxis.com" target="_blank" rel="noopener" class="text-brandblue hover:text-brandgreen transition-colors">QCXIS Sdn Bhd</a>
-            </p>
-        </div>
+    <!-- Footer - Compact -->
+    <footer class="absolute bottom-0 w-full text-gray-400 py-2 sm:py-3 text-center z-10">
+        <p class="text-[8px] sm:text-[9px] mb-0.5 sm:mb-1">
+            &copy; 2026 <span class="text-white font-semibold">HOME Math Therapy</span>
+        </p>
+        <p class="text-[7px] sm:text-[8px]">
+            Powered by <a href="https://qcxis.com" target="_blank" rel="noopener" class="text-brandyellow hover:text-white transition-colors">QCXIS Sdn Bhd</a>
+        </p>
     </footer>
 </body>
-
 </html>
