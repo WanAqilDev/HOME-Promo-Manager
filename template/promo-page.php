@@ -125,13 +125,32 @@ if (class_exists('\HPM\Manager')) {
         @media (max-width: 640px) {
             .mobile-compact { margin-bottom: 0.75rem !important; }
             .mobile-compact-sm { margin-bottom: 0.5rem !important; }
+            
+            /* Logo positioning for mobile */
+            .logo-container {
+                position: static !important;
+                margin-bottom: 1rem;
+            }
+            .logo-container > div {
+                border-radius: 1rem !important;
+                box-shadow: 0 10px 25px rgba(0,0,0,0.3) !important;
+            }
+        }
+        
+        /* Desktop logo positioning */
+        @media (min-width: 641px) {
+            .logo-container {
+                position: absolute;
+                top: 0;
+                left: 0;
+            }
         }
     </style>
 </head>
 
 <body class="flex flex-col items-center">
 
-    <div class="absolute top-0 left-0 z-20 animate__animated animate__fadeInDown">
+    <div class="logo-container z-20 animate__animated animate__fadeInDown">
         <div class="bg-white py-2 px-4 sm:py-4 sm:px-6 rounded-br-mega shadow-2xl transition-transform hover:scale-105">
             <img src="https://home.edu.my/sistemklon/oalsumte/2026/01/LOGO-HOME-AI-2-01.png" 
                  alt="HOME Logo" 
@@ -139,7 +158,7 @@ if (class_exists('\HPM\Manager')) {
         </div>
     </div>
 
-    <main class="w-full max-w-lg px-4 sm:px-6 flex flex-col items-center z-10 text-center">
+    <main class="w-full max-w-lg px-4 sm:px-6 pb-16 sm:pb-0 flex flex-col items-center z-10 text-center">
         
         <h2 class="text-white font-bold tracking-[0.3em] text-[8px] sm:text-[9px] mb-1 uppercase animate__animated animate__fadeIn animate__delay-1s">
             Terapi Matematik
@@ -149,7 +168,7 @@ if (class_exists('\HPM\Manager')) {
             PROMO <span class="not-italic text-2xl sm:text-3xl bolt-pulse">⚡</span>
         </h1>
 
-        <div class="ribbon-banner w-[110%] -ml-[5%] px-3 py-1.5 sm:px-4 sm:py-2 mb-3 sm:mb-4 flex justify-center animate__animated animate__fadeInLeft animate__delay-1s">
+        <div class="ribbon-banner w-full sm:w-[110%] sm:-ml-[5%] px-3 py-1.5 sm:px-4 sm:py-2 mb-3 sm:mb-4 flex justify-center animate__animated animate__fadeInLeft animate__delay-1s">
             <span class="text-3xl sm:text-4xl md:text-5xl font-black text-[#9D8BB1] tracking-tighter leading-none uppercase">Smart 26</span>
         </div>
 
@@ -188,8 +207,8 @@ if (class_exists('\HPM\Manager')) {
     </main>
 
     <!-- Footer - Compact -->
-    <footer class="absolute bottom-0 w-full text-gray-400 py-2 sm:py-3 text-center z-10">
-        <p class="text-[8px] sm:text-[9px] mb-0.5 sm:mb-1">
+    <footer class="absolute bottom-0 w-full text-gray-400 py-1.5 sm:py-3 text-center z-10">
+        <p class="text-[8px] sm:text-[9px] mb-0.5">
             &copy; 2026 <span class="text-white font-semibold">HOME Math Therapy</span>
         </p>
         <p class="text-[7px] sm:text-[8px]">
