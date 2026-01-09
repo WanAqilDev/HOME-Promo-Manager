@@ -196,5 +196,77 @@ if (class_exists('\HPM\Manager')) {
             Powered by <a href="https://qcxis.com" target="_blank" rel="noopener" class="text-brandyellow hover:text-white transition-colors">QCXIS Sdn Bhd</a>
         </p>
     </footer>
+
+    <script>
+        const API_ENDPOINT = "<?= $api_url ?>";
+        let targetTs = <?= $server_target_ts ?>;
+        const ORIGINAL_PRICE = 270.00;
+        const PRICE_FORMAT = new Intl.NumberFormat('en-MY', { style: 'currency', currency: 'MYR', minimumFractionDigits: 0 });
+
+        function pad(n) { return n < 10 ? '0' + n : n; }
+
+        async function updateRealtimeStats() {
+            try {
+                const res = await fetch(API_ENDPOINT);
+                const d = await res.json();
+                const statsEl = document.getElementById('liveStats');
+                
+                if (!d.active || d.remaining_total <= 0) {
+                    statsEl.style.opacity = '1';
+                    statsEl.classList.remove('translate-y-4');
+                    document.getElementById('priceDisplay').innerHTML = `<div class="text-white font-black text-sm uppercase">TAMAT</div>`;
+                    return;
+                }
+
+                const final = ORIGINAL_PRICE * 0.74;
+                document.getElementById('priceDisplay').innerHTML = `
+                    <div class="text-[9px] sm:text-[10px] text-white/70 line-through font-bold">${PRICE_FORMAT.format(ORIGINAL_PRICE)}</div>
+                    <div class="text-2xl sm:text-3xl font-black text-brandyellow leading-none my-1 animate__animated animate__flash">${PRICE_FORMAT.format(final)}</div>
+                    <div class="text-[7px] sm:text-[8px] bg-brandlime text-white px-2 py-0.5 rounded font-black uppercase">JIMAT 26%</div>
+                `;
+
+                document.getElementById('apiSlots').innerText = d.remaining_tier;
+                document.getElementById('apiTotal').innerText = d.remaining_total;
+                
+                if (d.end_time) targetTs = d.end_time * 1000;
+                
+                // Show the grid
+                statsEl.style.opacity = '1';
+                statsEl.classList.remove('translate-y-4');
+            } catch (e) { 
+                console.error('API Error:', e);
+            }
+        }
+
+        function render(parts) {
+            const labels = ['HARI', 'JAM', 'MIN', 'SAAT'];
+            const isMobile = window.innerWidth < 640;
+            const digitClass = isMobile ? 'w-11 h-14 text-xl' : 'w-12 h-16 text-2xl';
+            const labelClass = isMobile ? 'text-[7px] mt-1' : 'text-[7px] sm:text-[8px] mt-1.5';
+            
+            document.getElementById('flipClock').innerHTML = parts.map((v, i) => `
+                <div class="flex flex-col items-center">
+                    <div class="flip-digit ${digitClass} flex items-center justify-center font-black">${pad(v)}</div>
+                    <div class="${labelClass} text-white uppercase font-black tracking-widest opacity-80">${labels[i]}</div>
+                </div>
+            `).join('');
+        }
+
+        function tick() {
+            let diff = Math.max(targetTs - Date.now(), 0);
+            render([
+                Math.floor(diff / 86400000), 
+                Math.floor(diff % 86400000 / 3600000), 
+                Math.floor(diff % 3600000 / 60000), 
+                Math.floor(diff % 60000 / 1000)
+            ]);
+        }
+
+        // Initialize
+        setInterval(tick, 1000);
+        setInterval(updateRealtimeStats, 3000);
+        tick(); 
+        setTimeout(updateRealtimeStats, 500);
+    </script>
 </body>
 </html>
