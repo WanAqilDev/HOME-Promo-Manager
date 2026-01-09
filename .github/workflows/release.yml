@@ -63,7 +63,8 @@ jobs:
             --exclude='.github' \
             --exclude='node_modules' \
             --exclude='tests' \
-            --exclude='test-*.php' \
+            --exclude='test-edge-cases.php' \
+            --exclude='test-smart26.php' \
             --exclude='run-tests.php' \
             --exclude='debug_*.php' \
             --exclude='.phpunit.result.cache' \
