@@ -1,8 +1,10 @@
-<?php // Template Name: SMART 26 Promo (Animated & Fixed)
+<?php 
+// --- CONFIGURATION & API SETUP ---
 $bg_purple = '#510E7E';
 $yellow    = '#FFD231';
 $lime      = '#48BC13';
 
+// Fetching the REST API URL for the counter
 $api_url = get_rest_url(null, 'promo/v1/counter');
 
 $server_target_ts = 0;
@@ -17,275 +19,245 @@ if (class_exists('\HPM\Manager')) {
 }
 ?>
 <!DOCTYPE html>
-<html <?php language_attributes(); ?>>
+<html lang="en">
 <head>
-    <meta charset="<?php bloginfo('charset'); ?>">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMART 26 – Promo</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
-    <script src="<?= HOME_PROMO_MANAGER_URL ?>assets/js/tailwindcss.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: { brandpurple: '<?= $bg_purple ?>', brandyellow: '<?= $yellow ?>', brandlime: '<?= $lime ?>' },
-                    borderRadius: { 'mega': '50px' }
-                }
-            }
-        }
-    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Montserrat:wght@900&display=swap" rel="stylesheet">
+	<title>HOME PROMO - SMART26</title>
+	<link rel="icon" type="image/png" href="https://home.edu.my/sistemklon/oalsumte/2026/01/LOGO-HOME-AI-2-01.png">
+	<link rel="apple-touch-icon" href="https://home.edu.my/sistemklon/oalsumte/2026/01/LOGO-HOME-AI-2-01.png">
     <style>
-        :root { --p: <?= $bg_purple ?>; --y: <?= $yellow ?>; }
+        :root {
+            --purple-main: #510E7E;
+            --yellow-promo: #FFD231;
+            --yellow-fold: #C7A31B;
+            --green-pill: #30B11E;
+            --dark-bg: #2E0840;
+        }
+
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: var(--dark-bg); font-family: 'Inter', sans-serif; }
         
-        body {
-            background-color: var(--p);
-            background-image: 
-                radial-gradient(circle at center, #6a1ba3 0%, var(--p) 100%);
-            height: 100vh;
-            margin: 0;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Inter', sans-serif;
-            position: relative;
-        }
-
-        /* Mobile scaling */
-        @media (max-width: 640px) {
-            body {
-                justify-content: flex-start;
-                padding-top: 1rem;
+        /* Allow scrolling on mobile */
+        @media (max-width: 1023px) {
+            body, html { 
+                overflow-y: auto; 
+                overflow-x: hidden; 
+                padding-top: env(safe-area-inset-top, 0px);
+                height: auto;
+                min-height: 100vh;
             }
-        }
-
-        /* Diagonal lines overlay */
-        body::before {
-            content: "";
-            position: fixed;
-            inset: 0;
-            background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.03) 50%, rgba(255, 255, 255, 0.03) 75%, transparent 75%, transparent);
-            background-size: 30px 30px;
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        .ribbon-banner {
-            background: white;
-            transform: rotate(-3deg);
-            box-shadow: 10px 10px 0px rgba(0,0,0,0.15);
-            transition: all 0.3s ease;
-        }
-        .ribbon-banner:hover {
-            transform: rotate(-1deg) scale(1.02);
-            box-shadow: 15px 15px 0px rgba(0,0,0,0.1);
-        }
-
-        .cta-dud {
-            background: var(--y);
-            clip-path: polygon(0% 0%, 100% 0%, 95% 50%, 100% 100%, 0% 100%, 5% 50%);
-            padding: 12px 40px;
-            animation: breathe 3s ease-in-out infinite;
-            cursor: default;
-        }
-        
-        @media (max-width: 640px) {
-            .cta-dud {
-                padding: 10px 30px;
-            }
-        }
-
-        @keyframes breathe {
-            0%, 100% { transform: scale(1); filter: brightness(1); }
-            50% { transform: scale(1.05); filter: brightness(1.1); }
-        }
-
-        .flip-digit {
-            background: white;
-            color: var(--p);
-            border-radius: 12px;
-            box-shadow: 0 4px 0px #ccc;
-            transition: transform 0.2s;
-        }
-        .flip-digit:hover { transform: translateY(-5px); }
-
-        .bolt-pulse {
-            display: inline-block;
-            animation: pulseBolt 1.5s infinite;
-        }
-        @keyframes pulseBolt {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.3); opacity: 0.7; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
-        /* Mobile-specific adjustments */
-        @media (max-width: 640px) {
-            .mobile-compact { margin-bottom: 0.75rem !important; }
-            .mobile-compact-sm { margin-bottom: 0.5rem !important; }
             
-            /* Logo positioning for mobile */
-            .logo-container {
-                position: static !important;
-                margin-bottom: 1rem;
-            }
-            .logo-container > div {
-                border-radius: 1rem !important;
-                box-shadow: 0 10px 25px rgba(0,0,0,0.3) !important;
+            /* Make canvas adaptive to content on mobile */
+            #canvas {
+                min-height: 100vh !important;
+                height: auto !important;
             }
         }
+
+        /* --- Continuous Drift Animations --- */
+        @keyframes sweep-tr {
+            0%, 100% { transform: translate(0, 0) rotate(-15deg); }
+            50% { transform: translate(-5vw, 5vh) rotate(-10deg); }
+        }
+        @keyframes sweep-bl {
+            0%, 100% { transform: translate(0, 0) rotate(-15deg); }
+            50% { transform: translate(5vw, -5vh) rotate(-20deg); }
+        }
+        @keyframes particle-float {
+            0% { transform: translateY(0); opacity: 0; }
+            50% { opacity: 0.5; }
+            100% { transform: translateY(-100vh); opacity: 0; }
+        }
+        @keyframes flicker {
+            0%, 100% { opacity: 1; filter: drop-shadow(0 0 10px var(--yellow-promo)); }
+            50% { opacity: 0.8; filter: drop-shadow(0 0 20px var(--yellow-promo)); }
+        }
+
+        .animate-sweep-tr { animation: sweep-tr 18s ease-in-out infinite; }
+        .animate-sweep-bl { animation: sweep-bl 22s ease-in-out infinite; }
+        .animate-flicker { animation: flicker 0.15s ease-in-out infinite; }
         
-        /* Desktop logo positioning */
-        @media (min-width: 641px) {
-            .logo-container {
-                position: absolute;
-                top: 0;
-                left: 0;
-            }
-        }
+        /* Particle Style */
+        .particle { position: absolute; background-color: white; border-radius: 50%; opacity: 0; animation: particle-float linear infinite; pointer-events: none; }
+
+        /* --- UI & Parallax Layering --- */
+        .text-shadow-hard { text-shadow: 6px 6px 0px #3A0B5E; }
+        .clip-bolt { clip-path: polygon(45% 0%, 100% 0%, 70% 45%, 100% 45%, 0% 100%, 30% 55%, 0% 55%); }
+        .parallax-wrap { transition: transform 0.15s ease-out; will-change: transform; }
+
+        /* --- Folded Ribbon CTA --- */
+        .ribbon-wrapper { position: relative; width: 340px; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.4)); margin-top: 1rem; }
+        .ribbon-main { position: relative; background-color: var(--yellow-promo); color: black; font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 22px; text-align: center; padding: 12px 0; z-index: 20; border-radius: 2px; }
+        .ribbon-main::before, .ribbon-main::after { content: ''; position: absolute; bottom: -12px; border-style: solid; z-index: 5; }
+        .ribbon-main::before { left: 0; border-width: 0 12px 12px 0; border-color: transparent var(--yellow-fold) transparent transparent; }
+        .ribbon-main::after { right: 0; border-width: 0 0 12px 12px; border-color: transparent transparent transparent var(--yellow-fold); }
+        .ribbon-wing { position: absolute; top: 10px; height: 100%; width: 60px; background-color: var(--yellow-promo); z-index: 10; clip-path: polygon(0 0, 100% 0, 80% 50%, 100% 100%, 0 100%); }
+        .wing-left { left: -40px; transform: scaleX(-1); }
+        .wing-right { right: -40px; }
+
+        /* Countdown Digit */
+        .flip-digit { background: white; color: var(--purple-main); border-radius: 6px; box-shadow: 0 3px 0px #bbb; width: 45px; height: 55px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.4rem; }
+        
+        /* --- CHROME & FIREFOX MOBILE ONLY FIXES --- */
+        body.chrome-mobile .ribbon-wrapper { width: 240px; }
+        body.chrome-mobile .ribbon-main { font-size: 16px; padding: 8px 0; }
+        body.chrome-mobile .chrome-mobile-logo { margin-top: 2rem; }
     </style>
 </head>
+<body class="flex items-center justify-center">
+    <script>
+        // Detect Chrome mobile or Firefox mobile browser and add class
+        (function() {
+            const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+            const isFirefox = /Firefox/.test(navigator.userAgent);
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            if ((isChrome || isFirefox) && isMobile) {
+                document.body.classList.add('chrome-mobile');
+            }
+        })();
+    </script>
 
-<body class="flex flex-col items-center">
+    <div id="canvas" class="relative w-full min-h-screen lg:h-screen bg-[radial-gradient(circle_at_center_40%,_#6A2C91_0%,_#2E0840_100%)] overflow-hidden flex flex-col items-center justify-center lg:overflow-hidden">
+        
+        <div id="particle-container" class="absolute inset-0 z-10"></div>
 
-    <div class="logo-container z-20 animate__animated animate__fadeInDown">
-        <div class="bg-white py-2 px-4 sm:py-4 sm:px-6 rounded-br-mega shadow-2xl transition-transform hover:scale-105">
-            <img src="https://home.edu.my/sistemklon/oalsumte/2026/01/LOGO-HOME-AI-2-01.png" 
-                 alt="HOME Logo" 
-                 class="w-16 sm:w-24 md:w-28 h-auto object-contain">
+        <div id="parallax-tr" class="absolute top-[-5%] right-[-5%] z-0 parallax-wrap">
+            <div class="animate-sweep-tr">
+                <div class="w-[18vw] h-[30vh] bg-[#FFD231] rounded-[60px] opacity-80 blur-[1px]"></div>
+                <div class="mt-4 ml-8 w-32 h-24 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,#ffffff44_10px,#ffffff44_12px)]"></div>
+            </div>
+        </div>
+
+        <div id="parallax-bl" class="absolute bottom-[-5%] left-[-5%] z-0 parallax-wrap">
+            <div class="animate-sweep-bl">
+                <div class="w-[22vw] h-[35vh] bg-[#FFD231] rounded-[80px] opacity-80 blur-[1px]"></div>
+                <div class="mb-8 ml-16 w-40 h-32 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,#ffffff44_10px,#ffffff44_12px)]"></div>
+            </div>
+        </div>
+
+        <div class="relative z-40 flex flex-col items-center text-center px-4 max-w-2xl py-4 pb-8 pt-8 md:pt-8">
+            
+            <img src="https://home.edu.my/sistemmaklumat/oalsumte/2026/01/logo-stroke-puteh.png" class="w-32 md:w-40 h-auto mb-4 drop-shadow-xl animate-pulse chrome-mobile-logo" alt="HOME Logo">
+
+            <p class="text-white text-xs font-black tracking-[0.4em] uppercase opacity-80 mb-1">Terapi Matematik</p>
+            
+            <div class="relative mb-4">
+                <h1 class="text-[#FFD231] text-[9vw] lg:text-[110px] font-black leading-none text-shadow-hard tracking-tighter">PROMO</h1>
+                <div class="absolute -top-2 -right-12 lg:-right-16 w-12 lg:w-16 h-16 lg:h-24 bg-[#FFD231] clip-bolt rotate-[12deg] animate-flicker"></div>
+            </div>
+
+            <div class="relative w-[60vw] max-w-[500px] h-[10vh] max-h-[90px] rotate-[-4deg] mb-8">
+                <div class="w-full h-full bg-white shadow-xl flex items-center justify-center border-b-[6px] border-gray-100">
+                    <span class="text-[#510E7E] font-['Montserrat'] text-[7vw] lg:text-[75px] font-black tracking-tighter">SMART 26</span>
+                </div>
+                <div class="absolute -bottom-6 right-2 bg-[#4C0A87] border-2 border-white px-3 py-1 shadow-lg">
+                    <span class="text-[#FFD231] font-black text-[10px] uppercase">Potongan Sehingga 26%</span>
+                </div>
+            </div>
+
+            <div class="bg-[#30B11E] px-6 py-2 rounded-full shadow-lg mb-6 transform hover:scale-105 transition-transform">
+                <span class="text-white font-black text-lg md:text-xl">12-14 JANUARI 2026</span>
+            </div>
+
+            <div class="text-white font-bold text-xs md:text-sm leading-relaxed mb-4">
+                <p>Promosi terbuka kepada <span class="text-[#FFD231] italic underline decoration-2 underline-offset-4">pendaftaran baru.</span></p>
+                <p>Jangan lepaskan peluang anda!</p>
+            </div>
+
+            <div id="flipClock" class="flex gap-2 mb-6"></div>
+
+            <div id="liveStats" class="grid grid-cols-2 gap-3 w-full max-w-xs mb-6 opacity-0 transition-opacity duration-700">
+                <div class="bg-white/10 border border-[#FFD231] p-2 rounded-xl flex flex-col items-center justify-center backdrop-blur-sm">
+                    <div id="priceDisplay"></div>
+                </div>
+                <div class="bg-white p-2 rounded-xl flex flex-col items-center justify-center shadow-md">
+                    <span class="text-[8px] font-bold text-[#510E7E] uppercase opacity-50">Slots Left</span>
+                    <div id="apiSlots" class="text-2xl font-black text-[#510E7E] leading-none my-1">...</div>
+                    <span class="text-[8px] font-bold bg-[#510E7E]/10 px-2 py-0.5 rounded-full text-[#510E7E]">Total: <span id="apiTotal">...</span></span>
+                </div>
+            </div>
+
+            <div class="ribbon-wrapper group cursor-pointer hover:scale-105 transition-transform active:scale-95 mb-8">
+                <div class="ribbon-wing wing-left"></div>
+                <div class="ribbon-wing wing-right"></div>
+                <div class="ribbon-main">DAFTAR SEKARANG</div>
+            </div>
+
+            <a href="https://www.home.edu.my" class="block mb-8 text-[#FFD231] font-black text-xs tracking-widest uppercase opacity-40 hover:opacity-100 transition-opacity">www.home.edu.my</a>
+            
+            <footer class="w-full text-center mt-4 pb-2">
+                <p class="text-[9px] text-gray-500 uppercase tracking-tighter">
+                    &copy; 2026 <span class="text-white">HOME Maths Therapy</span> • Powered by <span class="text-[#FFD231]"><a href="https://www.qc.com.my">QCXIS Sdn Bhd</a></span>
+                </p>
+            </footer>
         </div>
     </div>
 
-    <main class="w-full max-w-lg px-4 sm:px-6 pb-16 sm:pb-0 flex flex-col items-center z-10 text-center">
-        
-        <h2 class="text-white font-bold tracking-[0.3em] text-[8px] sm:text-[9px] mb-1 uppercase animate__animated animate__fadeIn animate__delay-1s">
-            Terapi Matematik
-        </h2>
-        
-        <h1 class="text-4xl sm:text-5xl md:text-6xl font-black text-brandyellow italic tracking-tighter drop-shadow-2xl mb-2 leading-none animate__animated animate__zoomIn">
-            PROMO <span class="not-italic text-2xl sm:text-3xl bolt-pulse">⚡</span>
-        </h1>
-
-        <div class="ribbon-banner w-full sm:w-[110%] sm:-ml-[5%] px-3 py-1.5 sm:px-4 sm:py-2 mb-3 sm:mb-4 flex justify-center animate__animated animate__fadeInLeft animate__delay-1s">
-            <span class="text-3xl sm:text-4xl md:text-5xl font-black text-[#9D8BB1] tracking-tighter leading-none uppercase">Smart 26</span>
-        </div>
-
-        <div class="bg-brandpurple border-2 border-white px-3 py-1 sm:px-4 sm:py-1.5 rotate-[-3deg] mb-3 sm:mb-4 shadow-lg animate__animated animate__fadeInRight animate__delay-1s">
-            <span class="text-brandyellow font-bold text-[9px] sm:text-[10px] tracking-widest uppercase">Potongan Sehingga 26%</span>
-        </div>
-
-        <div class="flex gap-1.5 sm:gap-2 md:gap-3 mb-3 sm:mb-4 animate__animated animate__fadeInUp animate__delay-2s" id="flipClock"></div>
-
-        <div class="grid grid-cols-2 gap-2 sm:gap-3 w-full opacity-0 transition-all duration-700 transform translate-y-4 max-w-sm mb-3 sm:mb-4" id="liveStats">
-            <div class="bg-brandpurple/40 border-2 border-brandyellow p-2 sm:p-2.5 rounded-2xl flex flex-col justify-center items-center shadow-lg backdrop-blur-md hover:border-white transition-colors">
-                <div id="priceDisplay"></div>
-            </div>
-            <div class="bg-white p-2 sm:p-2.5 rounded-2xl text-brandpurple shadow-lg flex flex-col justify-center transition-transform hover:scale-95">
-                <div class="text-[7px] sm:text-[8px] font-bold uppercase opacity-60">Kekosongan Tier</div>
-                <div id="apiSlots" class="text-3xl sm:text-4xl font-black leading-none my-1">...</div>
-                <div class="text-[7px] sm:text-[8px] font-bold bg-brandpurple/10 px-2 py-0.5 rounded-full uppercase">Total: <span id="apiTotal">...</span></div>
-            </div>
-        </div>
-
-        <div class="bg-brandlime text-white font-black text-sm sm:text-base px-6 sm:px-8 py-2.5 sm:py-3 rounded-full shadow-2xl mb-3 sm:mb-4 animate__animated animate__pulse animate__infinite">
-            12 - 14 JANUARI 2026
-        </div>
-
-        <p class="text-white text-[11px] sm:text-xs leading-relaxed font-medium mb-3 sm:mb-4 animate__animated animate__fadeIn animate__delay-3s px-2">
-            Promosi terbuka kepada <span class="text-brandyellow italic font-black text-xs sm:text-sm underline decoration-brandlime">pendaftaran baru</span>.<br>
-            Jangan lepaskan peluang anda!
-        </p>
-
-        <div class="mb-2 sm:mb-3 cta-dud animate__animated animate__fadeInUp animate__delay-4s">
-            <span class="text-brandpurple font-black text-base sm:text-lg md:text-xl tracking-tighter">DAFTAR SEKARANG</span>
-        </div>
-
-        <a href="https://www.home.edu.my" class="text-brandyellow/60 text-[8px] sm:text-[9px] font-bold tracking-[0.4em] hover:text-white transition-all uppercase">WWW.HOME.EDU.MY</a>
-
-    </main>
-
-    <!-- Footer - Compact -->
-    <footer class="absolute bottom-0 w-full text-gray-400 py-1.5 sm:py-3 text-center z-10">
-        <p class="text-[8px] sm:text-[9px] mb-0.5">
-            &copy; 2026 <span class="text-white font-semibold">HOME Math Therapy</span>
-        </p>
-        <p class="text-[7px] sm:text-[8px]">
-            Powered by <a href="https://qcxis.com" target="_blank" rel="noopener" class="text-brandyellow hover:text-white transition-colors">QCXIS Sdn Bhd</a>
-        </p>
-    </footer>
-
     <script>
+        // --- API & Countdown Logic ---
         const API_ENDPOINT = "<?= $api_url ?>";
         let targetTs = <?= $server_target_ts ?>;
-        const ORIGINAL_PRICE = 270.00;
+        const ORIGINAL_PRICE = 200.00;
         const PRICE_FORMAT = new Intl.NumberFormat('en-MY', { style: 'currency', currency: 'MYR', minimumFractionDigits: 0 });
 
-        function pad(n) { return n < 10 ? '0' + n : n; }
-
-        async function updateRealtimeStats() {
+        async function updateStats() {
             try {
                 const res = await fetch(API_ENDPOINT);
                 const d = await res.json();
                 const statsEl = document.getElementById('liveStats');
-                
                 if (!d.active || d.remaining_total <= 0) {
-                    statsEl.style.opacity = '1';
-                    statsEl.classList.remove('translate-y-4');
-                    document.getElementById('priceDisplay').innerHTML = `<div class="text-white font-black text-sm uppercase">TAMAT</div>`;
+                    document.getElementById('priceDisplay').innerHTML = `<span class="text-white text-[10px] font-black uppercase">SOLD OUT</span>`;
                     return;
                 }
-
                 const final = ORIGINAL_PRICE * 0.74;
                 document.getElementById('priceDisplay').innerHTML = `
-                    <div class="text-[9px] sm:text-[10px] text-white/70 line-through font-bold">${PRICE_FORMAT.format(ORIGINAL_PRICE)}</div>
-                    <div class="text-2xl sm:text-3xl font-black text-brandyellow leading-none my-1 animate__animated animate__flash">${PRICE_FORMAT.format(final)}</div>
-                    <div class="text-[7px] sm:text-[8px] bg-brandlime text-white px-2 py-0.5 rounded font-black uppercase">JIMAT 26%</div>
+                    <div class="text-[8px] text-white/50 line-through font-bold">${PRICE_FORMAT.format(ORIGINAL_PRICE)}</div>
+                    <div class="text-xl font-black text-[#FFD231]">${PRICE_FORMAT.format(final)}</div>
                 `;
-
                 document.getElementById('apiSlots').innerText = d.remaining_tier;
                 document.getElementById('apiTotal').innerText = d.remaining_total;
-                
-                if (d.end_time) targetTs = d.end_time * 1000;
-                
-                // Show the grid
                 statsEl.style.opacity = '1';
-                statsEl.classList.remove('translate-y-4');
-            } catch (e) { 
-                console.error('API Error:', e);
-            }
-        }
-
-        function render(parts) {
-            const labels = ['HARI', 'JAM', 'MIN', 'SAAT'];
-            const isMobile = window.innerWidth < 640;
-            const digitClass = isMobile ? 'w-11 h-14 text-xl' : 'w-12 h-16 text-2xl';
-            const labelClass = isMobile ? 'text-[7px] mt-1' : 'text-[7px] sm:text-[8px] mt-1.5';
-            
-            document.getElementById('flipClock').innerHTML = parts.map((v, i) => `
-                <div class="flex flex-col items-center">
-                    <div class="flip-digit ${digitClass} flex items-center justify-center font-black">${pad(v)}</div>
-                    <div class="${labelClass} text-white uppercase font-black tracking-widest opacity-80">${labels[i]}</div>
-                </div>
-            `).join('');
+                if (d.end_time) targetTs = d.end_time * 1000;
+            } catch (e) { console.error(e); }
         }
 
         function tick() {
             let diff = Math.max(targetTs - Date.now(), 0);
-            render([
-                Math.floor(diff / 86400000), 
-                Math.floor(diff % 86400000 / 3600000), 
-                Math.floor(diff % 3600000 / 60000), 
-                Math.floor(diff % 60000 / 1000)
-            ]);
+            const parts = [Math.floor(diff / 86400000), Math.floor(diff % 86400000 / 3600000), Math.floor(diff % 3600000 / 60000), Math.floor(diff % 60000 / 1000)];
+            document.getElementById('flipClock').innerHTML = parts.map((v) => `<div class="flip-digit">${v < 10 ? '0'+v : v}</div>`).join('');
         }
 
-        // Initialize
-        setInterval(tick, 1000);
-        setInterval(updateRealtimeStats, 3000);
-        tick(); 
-        setTimeout(updateRealtimeStats, 500);
+        setInterval(tick, 1000); tick();
+        setInterval(updateStats, 4000); updateStats();
+
+        // --- FIXED PARALLAX & PARTICLES ---
+        const driftTR = document.getElementById('parallax-tr');
+        const driftBL = document.getElementById('parallax-bl');
+        const particleContainer = document.getElementById('particle-container');
+
+        // Mouse Parallax Fix
+        window.addEventListener('mousemove', (e) => {
+            const x = (e.clientX / window.innerWidth - 0.5) * 2;
+            const y = (e.clientY / window.innerHeight - 0.5) * 2;
+            driftTR.style.transform = `translate(${x * 30}px, ${y * 30}px)`;
+            driftBL.style.transform = `translate(${x * -40}px, ${y * -40}px)`;
+        });
+
+        // Background Particles
+        for (let i = 0; i < 40; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            const size = Math.random() * 3 + 2 + 'px';
+            p.style.width = size; p.style.height = size;
+            p.style.left = Math.random() * 100 + '%';
+            p.style.top = Math.random() * 100 + '%';
+            p.style.animationDuration = (Math.random() * 8 + 8) + 's';
+            p.style.animationDelay = (Math.random() * -15) + 's';
+            particleContainer.appendChild(p);
+        }
     </script>
 </body>
 </html>
