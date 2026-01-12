@@ -3,7 +3,7 @@
  * Plugin Name:       HOME Promo Manager
  * Plugin URI:        https://github.com/WanAqilDev/HOME-Promo-Manager
  * Description:       Promo manager for HOME with real-time counters (modular, split files).
- * Version:           0.3.3
+ * Version:           0.3.4
  * Requires PHP:      7.4
  * Author:            Wan Aqil Hazim, QCXIS Sdn Bhd
  * Text Domain:       home-promo-manager
@@ -22,7 +22,7 @@ define('HOME_PROMO_MANAGER_LOADED', true);
 define('HOME_PROMO_MANAGER_FILE', __FILE__);
 define('HOME_PROMO_MANAGER_DIR', plugin_dir_path(__FILE__));
 define('HOME_PROMO_MANAGER_URL', plugin_dir_url(__FILE__));
-define('HOME_PROMO_MANAGER_VERSION', '0.3.3');
+define('HOME_PROMO_MANAGER_VERSION', '0.3.4');
 
 // Cleanup old files on activation
 register_activation_hook(__FILE__, function() {

@@ -39,10 +39,17 @@ add_filter('frm_validate_entry', function ($errors, $values) {
         $entry_data = DB::get_entry_data($entry_id);
         $old_code = $entry_data['promo_code'] ?? '';
         
+        // CRITICAL FIX: If $new_code is empty, get it from entry meta (field might be readonly/disabled)
+        if (empty($new_code)) {
+            $new_code = ff_get_entry_meta($entry_id, (int)$promo_field);
+            $new_code = is_string($new_code) ? trim($new_code) : '';
+        }
+        
         if ($mgr->s('debug_mode')) {
             error_log(sprintf(
-                '[HPM-VALIDATE-EDIT] Entry #%d - Old: %s, New: %s',
-                $entry_id, $old_code, $new_code
+                '[HPM-VALIDATE-EDIT] Entry #%d - Old: %s, New: %s, From Meta: %s',
+                $entry_id, $old_code, $new_code, 
+                ff_get_entry_meta($entry_id, (int)$promo_field) ?: 'empty'
             ));
         }
         
