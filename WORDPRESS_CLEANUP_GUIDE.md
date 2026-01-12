@@ -1,11 +1,74 @@
 # WordPress Plugin Cleanup Guide v0.3.1
 
+## 🚨 EMERGENCY: Multiple Plugin Folders Issue
+
+**Problem:** Multiple versions installed simultaneously (e.g., v1.9, v2.0, v3.0, v3.1 folders all present)  
+**Symptom:** Two or more "HOME Promo Manager" plugins active in WordPress admin  
+**Risk:** Database conflicts, duplicate entries, incorrect quota counting
+
+### Immediate Fix (Safe Method)
+
+**Step 1: Backup Database**
+```sql
+-- Export tables before any changes
+SELECT * INTO OUTFILE '/tmp/home_promo_counted_backup.csv' FROM home_promo_counted;
+SELECT * INTO OUTFILE '/tmp/home_promo_reactivations_backup.csv' FROM home_promo_reactivations;
+```
+Or use phpMyAdmin: Export → Select tables → Go
+
+**Step 2: Identify Active Folder**
+1. SSH/FTP to: `wp-content/plugins/`
+2. You may see:
+   - `HOME-Promo-Manager/` (v3.0)
+   - `HOME-Promo-Manager-3.1/` (v3.1)
+   - `HOME-Promo-Manager-old/` (v1.9/2.0)
+   - Or similar naming variations
+
+**Step 3: Deactivate ALL Versions**
+```bash
+wp plugin deactivate --all
+```
+Or in WordPress admin: **Plugins → Deactivate** (click each HOME Promo Manager)
+
+**Step 4: Delete Old Folders (Keep Latest)**
+```bash
+cd wp-content/plugins/
+
+# Keep ONLY the v3.1 folder (usually named HOME-Promo-Manager)
+# Delete all others:
+rm -rf HOME-Promo-Manager-old
+rm -rf HOME-Promo-Manager-2.0
+rm -rf HOME-Promo-Manager-1.9
+# Or any variation you see
+
+# Verify only ONE folder remains:
+ls -la | grep -i "home-promo"
+```
+
+**Step 5: Activate Clean Installation**
+```bash
+wp plugin activate home-promo-manager
+```
+Or in WordPress admin: **Plugins → Activate** (only ONE should appear now)
+
+**Step 6: Verify Data Integrity**
+```sql
+-- Check quota data preserved
+SELECT COUNT(*) as total_entries FROM home_promo_counted;
+SELECT promo_code, COUNT(*) as redemptions FROM home_promo_counted GROUP BY promo_code;
+
+-- Check for duplicates (should return 0)
+SELECT entry_id, COUNT(*) as duplicates FROM home_promo_counted GROUP BY entry_id HAVING duplicates > 1;
+```
+
+---
+
 ## Overview
 This guide helps remove residual files from previous versions (1.9, 2.0, etc.) when updating from older installations to v0.3.1+.
 
 ## Important: Before Cleanup
 1. **Backup your database** - especially `home_promo_counted` and `home_promo_reactivations` tables
-2. **Deactivate the plugin** in WordPress admin (Plugins → Deactivate HOME Promo Manager)
+2. **Deactivate ALL plugin instances** in WordPress admin (Plugins → Deactivate each HOME Promo Manager)
 
 ## Files to Remove from WordPress
 
@@ -119,19 +182,55 @@ After cleanup, verify:
 
 ## Troubleshooting
 
+### Multiple Plugins Active (Duplicate Installation)
+**Symptom:** See "HOME Promo Manager" listed 2+ times in Plugins page
+
+**Cause:** Multiple plugin folders exist (e.g., `HOME-Promo-Manager/`, `HOME-Promo-Manager-3.1/`)
+
+**Fix:**
+1. Deactivate ALL instances
+2. Delete all folders except newest via FTP/SSH:
+   ```bash
+   cd wp-content/plugins/
+   ls -la | grep -i home-promo  # Identify all folders
+   rm -rf HOME-Promo-Manager-old  # Delete old versions
+   ```
+3. Keep ONLY one folder (rename to `HOME-Promo-Manager` if needed):
+   ```bash
+   mv HOME-Promo-Manager-3.1 HOME-Promo-Manager
+   ```
+4. Activate single remaining plugin
+
 ### Plugin Shows Wrong Version
 - Clear WordPress object cache: **wp cache flush** (if using caching plugin)
 - Deactivate → Reactivate plugin
+- Check folder name matches expected: `HOME-Promo-Manager`
 
 ### Settings Page Shows Errors
 - Check `wp-content/debug.log` for errors
 - Verify all files in `src/` directory exist
 - Re-upload plugin from GitHub
+- Ensure only ONE plugin folder exists
 
 ### Database Tables Missing
 Run migration manually:
 ```bash
 wp eval-file wp-content/plugins/HOME-Promo-Manager/migrate_to_smart26.php
+```
+
+### Quota Counts Wrong After Cleanup
+**Symptom:** Code usage shows incorrect numbers after removing duplicate installations
+
+**Fix:** Database tables are preserved, but check for duplicates:
+```sql
+-- Find duplicate entries
+SELECT entry_id, COUNT(*) as count FROM home_promo_counted 
+GROUP BY entry_id HAVING count > 1;
+
+-- Remove duplicates (keep first occurrence)
+DELETE t1 FROM home_promo_counted t1
+INNER JOIN home_promo_counted t2 
+WHERE t1.id > t2.id AND t1.entry_id = t2.entry_id;
 ```
 
 ## Support
