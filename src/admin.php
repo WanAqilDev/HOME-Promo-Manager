@@ -235,7 +235,13 @@ function render_admin_page()
 
     ?>
     <div class="wrap">
-        <h1>HOME Promo Manager</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h1 style="margin: 0;">HOME Promo Manager</h1>
+            <span style="background: #2271b1; color: white; padding: 6px 14px; border-radius: 4px; font-size: 13px; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <span class="dashicons dashicons-admin-plugins" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
+                v<?php echo esc_html(HOME_PROMO_MANAGER_VERSION); ?>
+            </span>
+        </div>
 
         <style>
             .hpm-dashboard {
