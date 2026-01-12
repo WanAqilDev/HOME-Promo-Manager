@@ -35,43 +35,58 @@ add_filter('frm_validate_entry', function ($errors, $values) {
     // ============================================
     // EDIT MODE: Entry exists in promo table
     // ============================================
-    if ($entry_id && DB::entry_exists($entry_id)) {
-        $entry_data = DB::get_entry_data($entry_id);
-        $old_code = $entry_data['promo_code'] ?? '';
+    if ($entry_id > 0) {
+        $exists_in_promo_table = DB::entry_exists($entry_id);
         
-        // CRITICAL FIX: If $new_code is empty, get it from entry meta (field might be readonly/disabled)
-        if (empty($new_code)) {
-            $new_code = ff_get_entry_meta($entry_id, (int)$promo_field);
-            $new_code = is_string($new_code) ? trim($new_code) : '';
-        }
+        // Enhanced debug logging
+        error_log(sprintf(
+            '[HPM-DEBUG] Validation Check - Entry ID: %d, Exists in promo table: %s, Promo field: %s',
+            $entry_id,
+            $exists_in_promo_table ? 'YES' : 'NO',
+            $promo_field
+        ));
         
-        if ($mgr->s('debug_mode')) {
-            error_log(sprintf(
-                '[HPM-VALIDATE-EDIT] Entry #%d - Old: %s, New: %s, From Meta: %s',
-                $entry_id, $old_code, $new_code, 
-                ff_get_entry_meta($entry_id, (int)$promo_field) ?: 'empty'
-            ));
-        }
-        
-        // Rule 1: If code unchanged, allow (status update or other fields)
-        if ($old_code === $new_code) {
-            if ($mgr->s('debug_mode')) {
-                error_log('[HPM-VALIDATE-EDIT] Code unchanged - allowing edit');
+        if ($exists_in_promo_table) {
+            $entry_data = DB::get_entry_data($entry_id);
+            $old_code = isset($entry_data['promo_code']) ? trim($entry_data['promo_code']) : '';
+            
+            // CRITICAL FIX: If $new_code is empty, get it from entry meta (field might be readonly/disabled)
+            if (empty($new_code)) {
+                $new_code = ff_get_entry_meta($entry_id, (int)$promo_field);
+                $new_code = is_string($new_code) ? trim($new_code) : '';
             }
-            return $errors; // ALLOW - no validation needed
+            
+            // Normalize both codes for comparison
+            $old_code_normalized = strtoupper(trim($old_code));
+            $new_code_normalized = strtoupper(trim($new_code));
+            
+            error_log(sprintf(
+                '[HPM-VALIDATE-EDIT] Entry #%d - Old: "%s" (%s), New: "%s" (%s), Match: %s',
+                $entry_id, 
+                $old_code, $old_code_normalized,
+                $new_code, $new_code_normalized,
+                ($old_code_normalized === $new_code_normalized) ? 'YES' : 'NO'
+            ));
+            
+            // Rule 1: If code unchanged (case-insensitive), allow all edits
+            if ($old_code_normalized === $new_code_normalized) {
+                error_log('[HPM-VALIDATE-EDIT] ✓ Code unchanged - ALLOWING EDIT');
+                return $errors; // ALLOW - no validation needed
+            }
+            
+            // Rule 2: Block ANY code changes during promo period
+            error_log(sprintf(
+                '[HPM-VALIDATE-EDIT] ✗ Code change attempt - BLOCKING (Old: %s → New: %s)',
+                $old_code, $new_code
+            ));
+            
+            if (!isset($errors['field' . $promo_field])) {
+                $errors['field' . $promo_field] = '';
+            }
+            $errors['field' . $promo_field] = 'Kod promo tidak boleh ditukar selepas pendaftaran.';
+            
+            return $errors;
         }
-        
-        // Rule 2: Block ANY code changes during promo period
-        if (!isset($errors['field' . $promo_field])) {
-            $errors['field' . $promo_field] = '';
-        }
-        $errors['field' . $promo_field] = 'Kod promo tidak boleh ditukar selepas pendaftaran.';
-        
-        if ($mgr->s('debug_mode')) {
-            error_log('[HPM-VALIDATE-EDIT] Code change blocked: ' . $old_code . ' → ' . $new_code);
-        }
-        
-        return $errors;
     }
     
     // ============================================
