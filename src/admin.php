@@ -478,10 +478,10 @@ function render_admin_page()
                     ?>
                     <tr data-code="<?php echo esc_attr($code); ?>">
                         <td><strong><?php echo esc_html($code); ?></strong></td>
-                        <td><?php echo esc_html($config['description'] ?? ''); ?></td>
-                        <td><?php echo $usage; ?></td>
-                        <td><?php echo $max; ?></td>
-                        <td><strong><?php echo $remaining; ?></strong></td>
+                        <td class="hpm-editable-desc" data-code="<?php echo esc_attr($code); ?>" contenteditable="true" style="cursor: text; border: 1px solid transparent; padding: 8px; border-radius: 3px;" title="Click to edit description"><?php echo esc_html($config['description'] ?? ''); ?></td>
+                        <td class="code-used"><?php echo $usage; ?></td>
+                        <td class="hpm-editable-quota" data-code="<?php echo esc_attr($code); ?>" data-usage="<?php echo $usage; ?>" contenteditable="true" style="cursor: text; border: 1px solid transparent; padding: 8px; border-radius: 3px; font-weight: bold;" title="Click to edit quota (min: current usage)"><?php echo $max; ?></td>
+                        <td class="code-remaining"><strong><?php echo $remaining; ?></strong></td>
                         <td>
                             <div style="background: #f0f0f1; height: 24px; border-radius: 12px; overflow: hidden;">
                                 <div style="background: <?php echo $bar_color; ?>; height: 100%; width: <?php echo $percent; ?>%; transition: width 0.3s;"></div>
@@ -762,6 +762,94 @@ function render_admin_page()
                 $('#hpm_new_code_max').val('50');
 
                 alert('Code "' + codeName + '" added!\n\n⚠ Click "Save Settings" below to activate it.');
+            });
+
+            // Inline Edit Description
+            $('.hpm-editable-desc').on('focus', function() {
+                $(this).css('border-color', '#2271b1');
+                $(this).data('original-value', $(this).text());
+            }).on('blur', function() {
+                $(this).css('border-color', 'transparent');
+                const code = $(this).data('code');
+                const newDesc = $(this).text().trim();
+                const originalValue = $(this).data('original-value');
+                
+                if (newDesc !== originalValue) {
+                    $('[name="home_promo_manager_settings[promo_codes][' + code + '][description]"]').val(newDesc);
+                    $(this).css('background', '#ffffcc');
+                    setTimeout(() => {
+                        $(this).css('background', '');
+                    }, 2000);
+                }
+            }).on('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    $(this).blur();
+                }
+            });
+
+            // Inline Edit Quota with Validation
+            $('.hpm-editable-quota').on('focus', function() {
+                $(this).css('border-color', '#2271b1');
+                $(this).data('original-value', $(this).text());
+            }).on('blur', function() {
+                $(this).css('border-color', 'transparent');
+                const code = $(this).data('code');
+                const usage = parseInt($(this).data('usage')) || 0;
+                let newQuota = parseInt($(this).text().trim());
+                const originalValue = parseInt($(this).data('original-value'));
+                
+                // Validate: must be a number and >= current usage
+                if (isNaN(newQuota) || newQuota < 1) {
+                    alert('Invalid quota! Must be a positive number.');
+                    $(this).text(originalValue);
+                    return;
+                }
+                
+                if (newQuota < usage) {
+                    alert('Quota cannot be less than current usage (' + usage + ')!\n\nCurrent redemptions: ' + usage);
+                    $(this).text(originalValue);
+                    return;
+                }
+                
+                if (newQuota !== originalValue) {
+                    // Update hidden field
+                    $('[name="home_promo_manager_settings[promo_codes][' + code + '][max]"]').val(newQuota);
+                    
+                    // Update remaining count
+                    const remaining = newQuota - usage;
+                    $(this).closest('tr').find('.code-remaining strong').text(remaining);
+                    
+                    // Update progress bar
+                    const percent = usage > 0 ? (usage / newQuota) * 100 : 0;
+                    const bar = $(this).closest('tr').find('.code-progress-bar');
+                    bar.css('width', percent + '%');
+                    
+                    // Update bar color
+                    let color = '#00a32a';
+                    if (percent >= 100) color = '#d63638';
+                    else if (percent >= 80) color = '#dba617';
+                    bar.css('background', color);
+                    
+                    $(this).closest('tr').find('.code-percentage').text(percent.toFixed(1) + '%');
+                    
+                    // Visual feedback
+                    $(this).css('background', '#ffffcc');
+                    setTimeout(() => {
+                        $(this).css('background', '');
+                    }, 2000);
+                    
+                    alert('Quota for "' + code + '" updated to ' + newQuota + '!\n\n⚠ Click "Save Settings" to persist this change.');
+                }
+            }).on('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    $(this).blur();
+                }
+                // Allow only numbers, backspace, delete, arrows
+                if (!((e.key >= '0' && e.key <= '9') || e.key === 'Backspace' || e.key === 'Delete' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Tab')) {
+                    e.preventDefault();
+                }
             });
 
             // Toggle Code Active/Inactive
