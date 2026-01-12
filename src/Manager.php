@@ -475,16 +475,21 @@ class Manager
         $now = new \DateTime('now', $tz);
         ff_update_entry_meta($entry_id, 9998, $now->format('Y-m-d H:i:s')); // Use a custom field ID for reactivation date
 
-        // Count this as an activation
+        // Count this as an activation (only if not already counted)
         error_log('[HPM] Counting reactivation as activation');
-        if ($mode === 'auto') {
-            $max = (int) $this->s('max');
-            DB::insert_entry($entry_id, $max);
+        if (!DB::entry_exists($entry_id)) {
+            if ($mode === 'auto') {
+                $max = (int) $this->s('max');
+                DB::insert_entry($entry_id, $max);
+            } else {
+                // SMART26 mode: use code-specific insertion
+                $code_config = $this->get_code_from_settings($code);
+                $max_for_code = (int) ($code_config['max'] ?? 0);
+                DB::insert_entry_with_code($entry_id, $code, $branch, $category, $max_for_code);
+            }
+            error_log('[HPM] Entry inserted into promo table');
         } else {
-            // SMART26 mode: use code-specific insertion
-            $code_config = $this->get_code_from_settings($code);
-            $max_for_code = (int) ($code_config['max'] ?? 0);
-            DB::insert_entry_with_code($entry_id, $code, $branch, $category, $max_for_code);
+            error_log('[HPM] Entry already exists in promo table - skipping insertion');
         }
 
         error_log('[HPM] Reactivation complete for entry ' . $entry_id);

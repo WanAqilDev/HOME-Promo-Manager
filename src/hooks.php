@@ -12,6 +12,7 @@ require_once __DIR__ . '/utils.php';
 add_filter('frm_validate_entry', function ($errors, $values) {
     $mgr = Manager::get_instance();
     $form_id = !empty($values['form_id']) ? (int) $values['form_id'] : 0;
+    $entry_id = !empty($values['id']) ? (int) $values['id'] : 0;
     
     if ($form_id !== (int) $mgr->s('form_id')) {
         return $errors;
@@ -28,6 +29,48 @@ add_filter('frm_validate_entry', function ($errors, $values) {
         return $errors; // Skip validation in auto mode
     }
 
+    $promo_field = (string) $mgr->s('promo_field_id');
+    $new_code = !empty($values['item_meta'][$promo_field]) ? trim($values['item_meta'][$promo_field]) : '';
+    
+    // ============================================
+    // EDIT MODE: Entry exists in promo table
+    // ============================================
+    if ($entry_id && DB::entry_exists($entry_id)) {
+        $entry_data = DB::get_entry_data($entry_id);
+        $old_code = $entry_data['promo_code'] ?? '';
+        
+        if ($mgr->s('debug_mode')) {
+            error_log(sprintf(
+                '[HPM-VALIDATE-EDIT] Entry #%d - Old: %s, New: %s',
+                $entry_id, $old_code, $new_code
+            ));
+        }
+        
+        // Rule 1: If code unchanged, allow (status update or other fields)
+        if ($old_code === $new_code) {
+            if ($mgr->s('debug_mode')) {
+                error_log('[HPM-VALIDATE-EDIT] Code unchanged - allowing edit');
+            }
+            return $errors; // ALLOW - no validation needed
+        }
+        
+        // Rule 2: Block ANY code changes during promo period
+        if (!isset($errors['field' . $promo_field])) {
+            $errors['field' . $promo_field] = '';
+        }
+        $errors['field' . $promo_field] = 'Kod promo tidak boleh ditukar selepas pendaftaran.';
+        
+        if ($mgr->s('debug_mode')) {
+            error_log('[HPM-VALIDATE-EDIT] Code change blocked: ' . $old_code . ' → ' . $new_code);
+        }
+        
+        return $errors;
+    }
+    
+    // ============================================
+    // NEW REGISTRATION MODE
+    // ============================================
+    
     // Check if user wants to register (Daftar = Ya)
     $daftar_field = (string) $mgr->s('daftar_field_id');
     $trigger_val = $mgr->s('daftar_trigger_value') ?: 'Ya';
@@ -37,41 +80,56 @@ add_filter('frm_validate_entry', function ($errors, $values) {
         return $errors; // Not registering, skip validation
     }
 
-    // Get promo code from submission
-    $promo_field = (string) $mgr->s('promo_field_id');
-    $code = !empty($values['item_meta'][$promo_field]) ? trim($values['item_meta'][$promo_field]) : '';
+    // CRITICAL: Reject legacy codes for new registrations
+    $legacy_codes = ['tiada', 'promo24', 'promo12', 'Tiada', 'TIADA', 'PROMO24', 'PROMO12'];
+    
+    if (in_array($new_code, $legacy_codes, true)) {
+        if (!isset($errors['field' . $promo_field])) {
+            $errors['field' . $promo_field] = '';
+        }
+        $errors['field' . $promo_field] = 'Kod promo ini tidak sah untuk pendaftaran baru. Sila gunakan kod SMART26 yang aktif.';
+        
+        if ($mgr->s('debug_mode')) {
+            error_log('[HPM-VALIDATE-NEW] Legacy code rejected: ' . $new_code);
+        }
+        return $errors;
+    }
+
+    // Require code for new registrations during promo
+    if (empty($new_code)) {
+        if (!isset($errors['field' . $promo_field])) {
+            $errors['field' . $promo_field] = '';
+        }
+        $errors['field' . $promo_field] = 'Sila masukkan kod promo SMART26.';
+        
+        if ($mgr->s('debug_mode')) {
+            error_log('[HPM-VALIDATE-NEW] Empty code rejected');
+        }
+        return $errors;
+    }
 
     if ($mgr->s('debug_mode')) {
         error_log(sprintf(
-            '[HPM-VALIDATE] Form submission - Code: %s, Daftar: %s',
-            $code, $daftar_val
+            '[HPM-VALIDATE-NEW] New registration - Code: %s, Daftar: %s',
+            $new_code, $daftar_val
         ));
     }
 
-    // OPTIONAL: If no code provided, allow submission (user chooses not to use promo)
-    if (empty($code)) {
-        if ($mgr->s('debug_mode')) {
-            error_log('[HPM-VALIDATE] No code provided - allowing submission without promo');
-        }
-        return $errors; // No validation needed
-    }
-
-    // Validate the code (only if user entered one)
-    $validation = $mgr->validate_code($code);
+    // Validate the code (quota check happens in Manager::validate_code)
+    $validation = $mgr->validate_code($new_code);
     
     if (!$validation['valid']) {
-        // Add error to the promo field
         if (!isset($errors['field' . $promo_field])) {
             $errors['field' . $promo_field] = '';
         }
         $errors['field' . $promo_field] = $validation['message'];
         
         if ($mgr->s('debug_mode')) {
-            error_log('[HPM-VALIDATE] Validation failed: ' . $validation['message']);
+            error_log('[HPM-VALIDATE-NEW] Validation failed: ' . $validation['message']);
         }
     } else {
         if ($mgr->s('debug_mode')) {
-            error_log('[HPM-VALIDATE] Code validated: ' . $validation['message']);
+            error_log('[HPM-VALIDATE-NEW] Code validated: ' . $validation['message']);
         }
     }
 
@@ -151,12 +209,14 @@ add_action('frm_after_create_entry', function ($entry_id, $form_id) {
             ));
         }
         
-        // OPTIONAL: If no code provided, skip promo tracking (user chose not to use promo)
-        if (empty($code) || $code === 'Tiada') {
+        // CRITICAL: Reject legacy codes and empty codes during active promo
+        $legacy_codes = ['tiada', 'promo24', 'promo12', 'Tiada', 'TIADA', 'PROMO24', 'PROMO12'];
+        if (empty($code) || in_array($code, $legacy_codes, true)) {
             if ($mgr->s('debug_mode')) {
-                error_log('[HPM-CREATE] No promo code - skipping SMART26 tracking');
+                error_log('[HPM-CREATE] Invalid/legacy code rejected: ' . $code);
             }
-            return; // User submitted without promo code, that's OK
+            // DO NOT TRACK - validation should have caught this
+            return;
         }
         
         // Validate and record with SMART26 system (only if code provided)
@@ -175,19 +235,22 @@ add_action('frm_after_create_entry', function ($entry_id, $form_id) {
     }
 }, 10, 2);
 
-// NEW REGISTRATION: Set default promo value on new entry creation (only if user didn't provide one)
+// REMOVED: Do not auto-fill promo code with legacy values during SMART26
+// Users must explicitly enter a valid SMART26 code or leave it empty
 add_filter('frm_pre_create_entry', function ($values) {
     $mgr = Manager::get_instance();
     $form_id = !empty($values['form_id']) ? (int) $values['form_id'] : 0;
     if ($form_id !== (int) $mgr->s('form_id'))
         return $values;
+    
+    // During SMART26 promo, do NOT auto-fill with 'Tiada'
+    // Let validation handle empty codes
     if (!isset($values['item_meta']) || !is_array($values['item_meta']))
         $values['item_meta'] = [];
-    $promo_key = (string) $mgr->s('promo_field_id');
-    // Only set default 'Tiada' if user hasn't entered a code
-    if (empty($values['item_meta'][$promo_key])) {
-        $values['item_meta'][$promo_key] = 'Tiada';
-    }
+    
+    // NOTE: Previously auto-filled with 'Tiada' in legacy mode
+    // Now disabled to enforce explicit code entry during SMART26 promo
+    // Validation will require code if Daftar=Ya
     return $values;
 });
 
@@ -382,22 +445,44 @@ add_action('frm_after_update_entry', function ($entry_id, $form_id) {
             if ($mgr->s('debug_mode'))
                 error_log('[HPM-DEBUG] QUALIFIED! Triggering reactivation.');
             
-            // Get promo code for SMART26 mode
-            $user_code = '';
-            $mode = $mgr->s('code_assignment_mode') ?: 'manual';
+            // Check if entry already exists in promo table (has been counted before)
+            $already_counted = DB::entry_exists($entry_id);
             
-            if ($mode === 'manual') {
-                // In SMART26 mode, get the code from the entry
-                $promo_field = (int) $mgr->s('promo_field_id');
-                $user_code = ff_get_field_value_robust($entry_id, $promo_field);
+            if ($already_counted) {
+                // Entry exists - check legacy status
+                $is_legacy = DB::is_legacy_entry($entry_id);
+                $entry_data = DB::get_entry_data($entry_id);
+                $existing_code = $entry_data['promo_code'] ?? '';
                 
                 if ($mgr->s('debug_mode')) {
-                    error_log(sprintf('[HPM-DEBUG] SMART26 reactivation with code: %s', $user_code));
+                    error_log(sprintf(
+                        '[HPM-REACTIVATE] Entry exists - Code: %s, Legacy: %s',
+                        $existing_code,
+                        $is_legacy ? 'YES' : 'NO'
+                    ));
                 }
+                
+                // Record reactivation with existing code (don't change it)
+                $mgr->record_reactivation($entry_id, $old_status, $new_status, $old_pasif, $existing_code);
+                
+            } else {
+                // New reactivation - needs code validation
+                $mode = $mgr->s('code_assignment_mode') ?: 'manual';
+                $user_code = '';
+                
+                if ($mode === 'manual') {
+                    // In SMART26 mode, get the code from the entry
+                    $promo_field = (int) $mgr->s('promo_field_id');
+                    $user_code = ff_get_field_value_robust($entry_id, $promo_field);
+                    
+                    if ($mgr->s('debug_mode')) {
+                        error_log(sprintf('[HPM-REACTIVATE] New reactivation with code: %s', $user_code));
+                    }
+                }
+                
+                // Process reactivation (quota check will apply)
+                $mgr->record_reactivation($entry_id, $old_status, $new_status, $old_pasif, $user_code);
             }
-            
-            // Process reactivation (pass user code for SMART26 validation)
-            $mgr->record_reactivation($entry_id, $old_status, $new_status, $old_pasif, $user_code);
         } else {
             if ($mgr->s('debug_mode'))
                 error_log('[HPM-DEBUG] Not qualified (<= 90 days and not partial).');
@@ -417,6 +502,40 @@ add_action('frm_after_update_entry', function ($entry_id, $form_id) {
         if ($mgr->s('debug_mode')) {
             error_log(sprintf('[HPM-DEBUG] Daftar status changed from %s to %s. Triggering activation.', var_export($old_daftar, true), var_export($new_daftar, true)));
         }
-        $mgr->record_activation($entry_id);
+        
+        // Check if already counted to avoid duplicates
+        if (DB::entry_exists($entry_id)) {
+            if ($mgr->s('debug_mode')) {
+                error_log('[HPM-DEBUG] Entry already counted - skipping duplicate activation');
+            }
+        } else {
+            $mode = $mgr->s('code_assignment_mode') ?: 'manual';
+            
+            if ($mode === 'auto') {
+                // Legacy auto mode
+                $mgr->record_activation($entry_id);
+            } else {
+                // SMART26 mode - get code and validate
+                $promo_field = (int) $mgr->s('promo_field_id');
+                $code = ff_get_field_value_robust($entry_id, $promo_field);
+                
+                if (empty($code)) {
+                    if ($mgr->s('debug_mode')) {
+                        error_log('[HPM-DEBUG] Daftar activation skipped - no code provided');
+                    }
+                } else {
+                    // Get branch and category
+                    $branch_field = (int) $mgr->s('branch_field_id');
+                    $branch = $branch_field ? ff_get_field_value_robust($entry_id, $branch_field) : '';
+                    $category = 'new'; // Default for Daftar change
+                    
+                    $result = $mgr->validate_and_record($code, $entry_id, $branch, $category);
+                    
+                    if ($mgr->s('debug_mode')) {
+                        error_log('[HPM-DEBUG] Daftar activation result: ' . $result['message']);
+                    }
+                }
+            }
+        }
     }
 }, 10, 2);

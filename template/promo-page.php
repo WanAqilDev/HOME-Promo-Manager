@@ -175,7 +175,8 @@ if (class_exists('\HPM\Manager')) {
                 </div>
                 <div class="bg-white p-2 rounded-xl flex flex-col items-center justify-center shadow-md">
                     <span class="text-[8px] font-bold text-[#510E7E] uppercase opacity-50">Slots Left</span>
-                    <div id="apiSlots" class="text-2xl font-black text-[#510E7E] leading-none my-1">...</div>
+                    <div id="apiCodeName" class="text-[9px] font-black text-[#FFD231] leading-none mt-1 opacity-0 transition-opacity duration-500">...</div>
+                    <div id="apiSlots" class="text-2xl font-black text-[#510E7E] leading-none my-1 opacity-0 transition-opacity duration-500">...</div>
                     <span class="text-[8px] font-bold bg-[#510E7E]/10 px-2 py-0.5 rounded-full text-[#510E7E]">Total: <span id="apiTotal">...</span></span>
                 </div>
             </div>
@@ -203,31 +204,84 @@ if (class_exists('\HPM\Manager')) {
         const ORIGINAL_PRICE = 200.00;
         const PRICE_FORMAT = new Intl.NumberFormat('en-MY', { style: 'currency', currency: 'MYR', minimumFractionDigits: 0 });
 
+        let activeCodes = [];
+        let currentCodeIndex = 0;
+
         async function updateStats() {
             try {
                 const res = await fetch(API_ENDPOINT);
                 const d = await res.json();
                 const statsEl = document.getElementById('liveStats');
+                
                 if (!d.active || d.remaining_total <= 0) {
                     document.getElementById('priceDisplay').innerHTML = `<span class="text-white text-[10px] font-black uppercase">SOLD OUT</span>`;
                     return;
                 }
+                
                 const final = ORIGINAL_PRICE * 0.74;
                 document.getElementById('priceDisplay').innerHTML = `
                     <div class="text-[8px] text-white/50 line-through font-bold">${PRICE_FORMAT.format(ORIGINAL_PRICE)}</div>
                     <div class="text-xl font-black text-[#FFD231]">${PRICE_FORMAT.format(final)}</div>
                 `;
-                document.getElementById('apiSlots').innerText = d.remaining_tier;
+
+                // Extract active codes data
+                if (d.codes && Array.isArray(d.codes)) {
+                    activeCodes = d.codes
+                        .filter(codeData => codeData.remaining > 0)
+                        .map(codeData => ({ code: codeData.code, remaining: codeData.remaining }));
+                }
+
                 document.getElementById('apiTotal').innerText = d.remaining_total;
-                statsEl.style.opacity = '1';
+                
                 if (d.end_time) targetTs = d.end_time * 1000;
-            } catch (e) { console.error(e); }
+                
+                // Show the grid and start code rotation
+                statsEl.style.opacity = '1';
+                if (activeCodes.length > 0 && !window.codeRotationStarted) {
+                    window.codeRotationStarted = true;
+                    rotateCode();
+                    setInterval(rotateCode, 3000);
+                }
+            } catch (e) { 
+                console.error(e);
+            }
+        }
+
+        function rotateCode() {
+            if (activeCodes.length === 0) return;
+            
+            const codeNameEl = document.getElementById('apiCodeName');
+            const slotsEl = document.getElementById('apiSlots');
+            
+            // Fade out
+            codeNameEl.style.opacity = '0';
+            slotsEl.style.opacity = '0';
+            
+            setTimeout(() => {
+                // Update content
+                const currentCode = activeCodes[currentCodeIndex];
+                codeNameEl.innerText = currentCode.code;
+                slotsEl.innerText = currentCode.remaining;
+                
+                // Fade in
+                codeNameEl.style.opacity = '1';
+                slotsEl.style.opacity = '1';
+                
+                // Move to next code
+                currentCodeIndex = (currentCodeIndex + 1) % activeCodes.length;
+            }, 500);
         }
 
         function tick() {
             let diff = Math.max(targetTs - Date.now(), 0);
             const parts = [Math.floor(diff / 86400000), Math.floor(diff % 86400000 / 3600000), Math.floor(diff % 3600000 / 60000), Math.floor(diff % 60000 / 1000)];
-            document.getElementById('flipClock').innerHTML = parts.map((v) => `<div class="flip-digit">${v < 10 ? '0'+v : v}</div>`).join('');
+            const labels = ['HARI', 'JAM', 'MINIT', 'SAAT'];
+            document.getElementById('flipClock').innerHTML = parts.map((v, i) => `
+                <div class="flex flex-col items-center">
+                    <div class="flip-digit">${v < 10 ? '0'+v : v}</div>
+                    <span class="text-white/60 text-[8px] font-bold mt-1 tracking-wider">${labels[i]}</span>
+                </div>
+            `).join('');
         }
 
         setInterval(tick, 1000); tick();

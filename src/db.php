@@ -47,11 +47,13 @@ class DB
             branch VARCHAR(100) DEFAULT '',
             user_category VARCHAR(50) DEFAULT '',
             eligibility_verified TINYINT(1) DEFAULT 0,
+            is_legacy TINYINT(1) DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             UNIQUE KEY uq_entry (entry_id),
             KEY idx_code (promo_code),
-            KEY idx_category (user_category)
+            KEY idx_category (user_category),
+            KEY idx_legacy (is_legacy)
         ) $charset;";
 
         // Reactivation tracking table
@@ -435,5 +437,116 @@ class DB
         global $wpdb;
         $table = self::reactivation_table_name();
         return (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table}");
+    }
+
+    /**
+     * Check if entry exists in promo tracking table
+     * 
+     * @param int $entry_id Formidable entry ID
+     * @return bool True if entry exists
+     */
+    public static function entry_exists($entry_id)
+    {
+        global $wpdb;
+        $table = self::table_name();
+        $count = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE entry_id = %d",
+            (int) $entry_id
+        ));
+        return (int) $count > 0;
+    }
+
+    /**
+     * Get entry data from promo table
+     * 
+     * @param int $entry_id Formidable entry ID
+     * @return array|null Entry data or null if not found
+     */
+    public static function get_entry_data($entry_id)
+    {
+        global $wpdb;
+        $table = self::table_name();
+        return $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$table} WHERE entry_id = %d",
+            (int) $entry_id
+        ), ARRAY_A);
+    }
+
+    /**
+     * Check if entry is marked as legacy
+     * 
+     * @param int $entry_id Formidable entry ID
+     * @return bool True if legacy entry
+     */
+    public static function is_legacy_entry($entry_id)
+    {
+        global $wpdb;
+        $table = self::table_name();
+        $is_legacy = $wpdb->get_var($wpdb->prepare(
+            "SELECT is_legacy FROM {$table} WHERE entry_id = %d",
+            (int) $entry_id
+        ));
+        return (int) $is_legacy === 1;
+    }
+
+    /**
+     * Update entry's is_legacy flag
+     * 
+     * @param int $entry_id Formidable entry ID
+     * @param bool $is_legacy Legacy flag value
+     * @return bool Success
+     */
+    public static function set_legacy_flag($entry_id, $is_legacy = true)
+    {
+        global $wpdb;
+        $table = self::table_name();
+        $result = $wpdb->update(
+            $table,
+            ['is_legacy' => $is_legacy ? 1 : 0],
+            ['entry_id' => (int) $entry_id],
+            ['%d'],
+            ['%d']
+        );
+        return $result !== false;
+    }
+
+    /**
+     * Add is_legacy column if it doesn't exist (for migration)
+     * 
+     * @return bool Success
+     */
+    public static function add_legacy_column()
+    {
+        global $wpdb;
+        $table = self::table_name();
+        
+        // Check if column exists
+        $column_exists = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+             WHERE TABLE_SCHEMA = %s 
+             AND TABLE_NAME = %s 
+             AND COLUMN_NAME = 'is_legacy'",
+            DB_NAME,
+            $table
+        ));
+        
+        if ((int) $column_exists > 0) {
+            return true; // Already exists
+        }
+        
+        // Add column
+        $sql = "ALTER TABLE {$table} 
+                ADD COLUMN is_legacy TINYINT(1) DEFAULT 0 AFTER eligibility_verified,
+                ADD INDEX idx_legacy (is_legacy)";
+        
+        $result = $wpdb->query($sql);
+        
+        if ($result === false) {
+            error_log('[HPM] Failed to add is_legacy column: ' . $wpdb->last_error);
+            return false;
+        }
+        
+        error_log('[HPM] Successfully added is_legacy column');
+        return true;
     }
 }
