@@ -226,3 +226,4 @@ $GLOBALS['wpdb'] = new MockWPDB();
 require_once __DIR__ . '/../src/db.php';
 require_once __DIR__ . '/../src/Manager.php';
 require_once __DIR__ . '/../src/CampaignEngine.php';
+require_once __DIR__ . '/../src/Eligibility.php';

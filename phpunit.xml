@@ -11,6 +11,7 @@
             <directory suffix="-test.php">tests</directory>
             <file>tests/test-manager.php</file>
             <file>tests/test-campaign-engine.php</file>
+            <file>tests/test-eligibility.php</file>
         </testsuite>
     </testsuites>
 </phpunit>
