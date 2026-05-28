@@ -66,10 +66,10 @@ add_action('wp_ajax_hpm_get_realtime_stats', function() {
 add_action('admin_menu', function () {
     add_options_page(
         'HOME Promo Manager',
-        'HOME Promo Manager',
-        'manage_options',
+        'Promo Manager',
+        CampaignEngine::CAP,
         'home-promo-manager',
-        '\\HPM\\render_admin_page'
+        'HPM\\hpm_render_admin_page'
     );
 });
 
@@ -161,12 +161,11 @@ function sanitize_settings($input)
 }
 
 /**
- * Render the settings page
+ * Render the settings tab content (no outer wrap — provided by tab router)
  */
-function render_admin_page()
+function hpm_render_settings_tab(): void
 {
-    if (!current_user_can('manage_options'))
-        wp_die('Insufficient permissions');
+    hpm_admin_guard();
 
     // Load current settings (ensures defaults)
     $opts = get_option('home_promo_manager_settings', []);
@@ -234,11 +233,10 @@ function render_admin_page()
     }
 
     ?>
-    <div class="wrap">
+    <div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h1 style="margin: 0;">HOME Promo Manager</h1>
+            <h2 style="margin: 0;">Settings</h2>
             <span style="background: #2271b1; color: white; padding: 6px 14px; border-radius: 4px; font-size: 13px; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                <span class="dashicons dashicons-admin-plugins" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
                 v<?php echo esc_html(HOME_PROMO_MANAGER_VERSION); ?>
             </span>
         </div>
@@ -383,7 +381,8 @@ function render_admin_page()
             </div>
         </div>
 
-        <!-- SMART26: Code Assignment Mode Toggle -->
+        <!-- Code Assignment Mode Toggle (legacy — kept for reference, hidden in new UI) -->
+        <?php if (false): ?>
         <div class="hpm-mode-toggle" style="background: #fff; border: 1px solid #ccd0d4; padding: 20px; margin-bottom: 20px; border-radius: 4px;">
             <h2 style="margin-top: 0;">Code Assignment Mode</h2>
             
@@ -439,7 +438,8 @@ function render_admin_page()
             </div>
         </div>
 
-        <!-- SMART26: Dynamic Code Management Section -->
+        <!-- Dynamic Code Management (legacy — removed in v1.0 — campaigns managed via Campaigns tab) -->
+        <?php if (false): ?>
         <div class="hpm-code-management" style="background: #fff; border: 1px solid #ccd0d4; padding: 20px; margin-bottom: 20px; border-radius: 4px;">
             <h2 style="margin-top: 0;">Promo Codes Management (SMART26)</h2>
             
@@ -536,6 +536,7 @@ function render_admin_page()
                 </button>
             </div>
         </div>
+        <?php endif; // end legacy sections ?>
 
         <form method="post" action="options.php" id="hpm-settings-form">
             <?php settings_fields('hpm_settings_group');
@@ -966,4 +967,285 @@ function render_admin_page()
         });
         </script>
         <?php
+}
+
+// =========================================================================
+// Tab router + Campaigns tab — added for Campaign Engine v1.0
+// =========================================================================
+
+function hpm_admin_guard(): void {
+    if (!current_user_can(CampaignEngine::CAP)) {
+        wp_die(__('Insufficient permissions.', 'home-promo-manager'), 403);
+    }
+}
+
+function hpm_render_admin_page(): void {
+    hpm_admin_guard();
+    $tab = sanitize_text_field($_GET['tab'] ?? 'campaigns');
+    echo '<div class="wrap"><h1>HOME Promo Manager</h1>';
+    echo '<nav class="nav-tab-wrapper">';
+    echo '<a href="?page=home-promo-manager&tab=campaigns" class="nav-tab'
+        . ($tab === 'campaigns' ? ' nav-tab-active' : '') . '">Campaigns</a>';
+    echo '<a href="?page=home-promo-manager&tab=settings" class="nav-tab'
+        . ($tab === 'settings' ? ' nav-tab-active' : '') . '">Settings</a>';
+    echo '</nav>';
+    if ($tab === 'campaigns') hpm_render_campaigns_tab();
+    else hpm_render_settings_tab();
+    echo '</div>';
+}
+
+function hpm_render_campaigns_tab(): void {
+    global $wpdb;
+    hpm_admin_guard();
+    hpm_handle_campaign_actions();
+
+    $campaigns = $wpdb->get_results(
+        "SELECT c.*,
+                (SELECT COUNT(*) FROM {$wpdb->prefix}home_promo_counted cc WHERE cc.campaign_id = c.id) AS used_count,
+                a.campaign_id AS is_pointed
+           FROM {$wpdb->prefix}home_promo_campaigns c
+      LEFT JOIN {$wpdb->prefix}home_promo_active a ON a.singleton = 1
+          ORDER BY c.id DESC"
+    );
+
+    echo '<h2>Campaigns</h2>';
+    echo '<a href="?page=home-promo-manager&tab=campaigns&action=new" class="page-title-action">Add New</a>';
+    echo '<table class="wp-list-table widefat fixed striped"><thead><tr>';
+    echo '<th>Name</th><th>Slug</th><th>Mode</th><th>Status</th><th>Dates (UTC)</th><th>Quota</th><th>Used</th><th>Actions</th>';
+    echo '</tr></thead><tbody>';
+    foreach ((array) $campaigns as $c) {
+        $is_active_ptr = ($c->is_pointed == $c->id);
+        $live_badge    = $is_active_ptr ? '<strong>[LIVE]</strong> ' : '';
+        printf(
+            '<tr><td>%s%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s – %s</td><td>%d</td><td>%d</td><td>%s</td></tr>',
+            $live_badge,
+            esc_html($c->name),
+            esc_html($c->slug),
+            esc_html($c->mode),
+            esc_html($c->status),
+            esc_html(wp_date('Y-m-d H:i', strtotime($c->start_date . ' UTC'))),
+            esc_html(wp_date('Y-m-d H:i', strtotime($c->end_date   . ' UTC'))),
+            (int) $c->quota,
+            (int) $c->used_count,
+            hpm_campaign_actions_html((int) $c->id, $c->status, $is_active_ptr)
+        );
+    }
+    echo '</tbody></table>';
+
+    $action = sanitize_text_field($_GET['action'] ?? '');
+    if ($action === 'new') hpm_render_campaign_form(null);
+    if ($action === 'edit') {
+        $id  = (int) ($_GET['campaign_id'] ?? 0);
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}home_promo_campaigns WHERE id = %d", $id
+        ));
+        if ($row) hpm_render_campaign_form($row);
+    }
+}
+
+function hpm_campaign_actions_html(int $id, string $status, bool $is_active_ptr): string {
+    $base = '?page=home-promo-manager&tab=campaigns';
+    $html = "<a href='{$base}&action=edit&campaign_id={$id}'>Edit</a> | ";
+    if (!$is_active_ptr) {
+        $html .= "<a href='{$base}&action=activate&campaign_id={$id}'>Activate</a> | ";
+    } else {
+        $html .= "<a href='{$base}&action=deactivate&campaign_id={$id}'>Deactivate</a> | ";
+    }
+    $html .= "<a href='{$base}&action=delete&campaign_id={$id}' onclick='return confirm(\"Delete?\")'>Delete</a>";
+    return $html;
+}
+
+function hpm_render_campaign_form(?object $c): void {
+    $is_edit = ($c !== null);
+    $action  = $is_edit ? 'save_edit' : 'save_new';
+    echo '<hr><h3>' . ($is_edit ? 'Edit Campaign' : 'New Campaign') . '</h3>';
+    echo '<form method="post" action="?page=home-promo-manager&tab=campaigns">';
+    wp_nonce_field('hpm_campaign_save');
+    echo '<input type="hidden" name="hpm_action" value="' . esc_attr($action) . '">';
+    if ($is_edit) {
+        echo '<input type="hidden" name="campaign_id" value="' . (int) $c->id . '">';
+    }
+    $sd = $is_edit ? wp_date('Y-m-d H:i:s', strtotime($c->start_date . ' UTC')) : '';
+    $ed = $is_edit ? wp_date('Y-m-d H:i:s', strtotime($c->end_date   . ' UTC')) : '';
+    ?>
+    <table class="form-table">
+      <tr><th>Name</th><td><input name="name" value="<?= esc_attr($c->name ?? '') ?>" class="regular-text" required></td></tr>
+      <tr><th>Slug</th><td><input name="slug" value="<?= esc_attr($c->slug ?? '') ?>" class="regular-text"></td></tr>
+      <tr><th>Mode</th><td>
+        <select name="mode">
+          <option value="auto"   <?= ($c->mode ?? '') === 'auto'   ? 'selected' : '' ?>>Auto</option>
+          <option value="manual" <?= ($c->mode ?? '') === 'manual' ? 'selected' : '' ?>>Manual</option>
+        </select>
+      </td></tr>
+      <tr><th>Start Date (site tz)</th><td><input type="datetime-local" name="start_date" value="<?= esc_attr(str_replace(' ', 'T', $sd)) ?>"></td></tr>
+      <tr><th>End Date (site tz)</th><td><input type="datetime-local" name="end_date" value="<?= esc_attr(str_replace(' ', 'T', $ed)) ?>"></td></tr>
+      <tr><th>Quota</th><td><input type="number" name="quota" value="<?= (int)($c->quota ?? 0) ?>" min="1"></td></tr>
+      <tr><th>Discount (RM)</th><td><input type="number" name="discount_amount" value="<?= esc_attr($c->discount_amount ?? '') ?>" step="0.01" min="0.01" max="999999.99"></td></tr>
+      <tr><th>Campaign Code (auto)</th><td><input name="campaign_code" value="<?= esc_attr($c->campaign_code ?? '') ?>" maxlength="40"></td></tr>
+      <tr><th>Codes Config (manual, JSON)</th><td><textarea name="codes_config" rows="3" cols="50"><?= esc_textarea($c->codes_config ?? '') ?></textarea></td></tr>
+    </table>
+    <p><button type="submit" class="button button-primary">Save Campaign</button></p>
+    </form>
+    <?php
+}
+
+function hpm_handle_campaign_actions(): void {
+    global $wpdb;
+    $hpm_action = sanitize_text_field($_POST['hpm_action'] ?? $_GET['action'] ?? '');
+    if (!$hpm_action) return;
+    if (!in_array($hpm_action, ['save_new','save_edit','activate','deactivate','delete'], true)) return;
+
+    hpm_admin_guard();
+    check_admin_referer('hpm_campaign_save');
+
+    if ($hpm_action === 'save_new' || $hpm_action === 'save_edit') {
+        $data  = hpm_sanitise_campaign_fields($_POST);
+        $error = hpm_validate_campaign_fields($data, $hpm_action === 'save_edit' ? (int)($_POST['campaign_id'] ?? 0) : null);
+        if ($error) {
+            echo '<div class="notice notice-error"><p>' . esc_html($error) . '</p></div>';
+            return;
+        }
+        if ($hpm_action === 'save_new') {
+            $wpdb->query($wpdb->prepare(
+                "INSERT INTO {$wpdb->prefix}home_promo_campaigns
+                   (name,slug,status,mode,start_date,end_date,quota,discount_amount,campaign_code,codes_config,created_at,updated_at)
+                 VALUES (%s,%s,'draft',%s,%s,%s,%d,%f,%s,%s,UTC_TIMESTAMP(),UTC_TIMESTAMP())",
+                $data['name'], $data['slug'], $data['mode'],
+                $data['start_date'], $data['end_date'],
+                $data['quota'], $data['discount_amount'],
+                $data['campaign_code'], $data['codes_config']
+            ));
+        } else {
+            $id = (int) ($_POST['campaign_id'] ?? 0);
+            $wpdb->query($wpdb->prepare(
+                "UPDATE {$wpdb->prefix}home_promo_campaigns
+                    SET name=%s,slug=%s,mode=%s,start_date=%s,end_date=%s,
+                        quota=%d,discount_amount=%f,campaign_code=%s,codes_config=%s,
+                        updated_at=UTC_TIMESTAMP()
+                  WHERE id=%d",
+                $data['name'], $data['slug'], $data['mode'],
+                $data['start_date'], $data['end_date'],
+                $data['quota'], $data['discount_amount'],
+                $data['campaign_code'], $data['codes_config'], $id
+            ));
+            CampaignEngine::flush();
+        }
+        echo '<div class="notice notice-success"><p>Campaign saved.</p></div>';
+        return;
+    }
+
+    $campaign_id = (int) ($_GET['campaign_id'] ?? 0);
+    $user_id     = get_current_user_id();
+
+    if ($hpm_action === 'activate') {
+        $result = CampaignEngine::activate($campaign_id, $user_id);
+        if ($result['status'] === 'conflict') {
+            echo '<div class="notice notice-error"><p>'
+                . esc_html("Campaign #{$result['conflict_id']} is already active. Deactivate it first.")
+                . '</p></div>';
+        } else {
+            echo '<div class="notice notice-success"><p>Campaign activated.</p></div>';
+        }
+    }
+
+    if ($hpm_action === 'deactivate') {
+        CampaignEngine::deactivate($campaign_id, $user_id);
+        echo '<div class="notice notice-success"><p>Campaign deactivated.</p></div>';
+    }
+
+    if ($hpm_action === 'delete') {
+        $pointed = (int) $wpdb->get_var(
+            "SELECT campaign_id FROM {$wpdb->prefix}home_promo_active WHERE singleton=1"
+        );
+        if ($pointed === $campaign_id) {
+            echo '<div class="notice notice-error"><p>Cannot delete the active campaign. Deactivate first.</p></div>';
+            return;
+        }
+        $wpdb->query($wpdb->prepare(
+            "DELETE FROM {$wpdb->prefix}home_promo_campaigns WHERE id = %d", $campaign_id
+        ));
+        CampaignEngine::flush();
+        echo '<div class="notice notice-success"><p>Campaign deleted.</p></div>';
+    }
+}
+
+function hpm_sanitise_campaign_fields(array $post): array {
+    $mode             = sanitize_text_field($post['mode'] ?? '');
+    $raw_codes_config = $post['codes_config'] ?? '';
+    $codes_config_encoded = null;
+    if ($mode === 'manual' && !empty($raw_codes_config)) {
+        try {
+            $decoded = json_decode($raw_codes_config, true, 512, JSON_THROW_ON_ERROR);
+            $codes_config_encoded = wp_json_encode($decoded);
+        } catch (\JsonException $e) {
+            $codes_config_encoded = '__INVALID_JSON__';
+        }
+    }
+
+    $sd_input = sanitize_text_field(str_replace('T', ' ', $post['start_date'] ?? ''));
+    $ed_input = sanitize_text_field(str_replace('T', ' ', $post['end_date'] ?? ''));
+    $sd_utc   = hpm_local_to_utc($sd_input);
+    $ed_utc   = hpm_local_to_utc($ed_input);
+
+    return [
+        'name'            => sanitize_text_field($post['name'] ?? ''),
+        'slug'            => sanitize_title($post['slug'] ?? sanitize_text_field($post['name'] ?? '')),
+        'mode'            => $mode,
+        'start_date'      => $sd_utc,
+        'end_date'        => $ed_utc,
+        'quota'           => absint($post['quota'] ?? 0),
+        'discount_amount' => (float) ($post['discount_amount'] ?? 0),
+        'campaign_code'   => ($mode === 'auto') ? substr(sanitize_text_field($post['campaign_code'] ?? ''), 0, 40) : null,
+        'codes_config'    => ($mode === 'manual') ? $codes_config_encoded : null,
+    ];
+}
+
+function hpm_local_to_utc(string $local_datetime): string {
+    try {
+        $dt = new \DateTime($local_datetime, wp_timezone());
+        $dt->setTimezone(new \DateTimeZone('UTC'));
+        return $dt->format('Y-m-d H:i:s');
+    } catch (\Exception $e) {
+        return '';
+    }
+}
+
+function hpm_validate_campaign_fields(array $data, ?int $edit_id): ?string {
+    global $wpdb;
+
+    if (empty($data['name']))                           return 'Name is required.';
+
+    $slug = $data['slug'];
+    if (empty($slug))                                   return 'Slug could not be generated. Please enter a manual slug using Latin characters.';
+    if (strlen($slug) < 3)                              return 'Slug must be at least 3 characters long.';
+    if (strlen($slug) > 80)                             return 'Slug must be 80 characters or fewer.';
+
+    $dup = $edit_id
+        ? $wpdb->prepare("SELECT id FROM {$wpdb->prefix}home_promo_campaigns WHERE slug=%s AND id<>%d", $slug, $edit_id)
+        : $wpdb->prepare("SELECT id FROM {$wpdb->prefix}home_promo_campaigns WHERE slug=%s", $slug);
+    if ($wpdb->get_var($dup))                           return 'A campaign with this slug already exists.';
+
+    if (!in_array($data['mode'], ['auto','manual'], true)) return 'Invalid mode.';
+    if (empty($data['start_date']))                     return 'Start date is required.';
+    if (empty($data['end_date']))                       return 'End date is required.';
+    if ($data['end_date'] <= $data['start_date'])       return 'End date must be after start date.';
+    if ($data['quota'] === 0)                           return 'Quota must be at least 1.';
+    if ($data['discount_amount'] <= 0)                  return 'Discount must be greater than 0.';
+    if ($data['discount_amount'] > 999999.99)           return 'Discount exceeds maximum (RM 999,999.99).';
+
+    if ($data['mode'] === 'auto' && empty($data['campaign_code'])) {
+        return 'Campaign code is required for auto mode.';
+    }
+    if ($data['mode'] === 'manual') {
+        if ($data['codes_config'] === '__INVALID_JSON__') return 'Codes config must be valid JSON.';
+        if (empty($data['codes_config']))                return 'Codes config is required for manual mode.';
+    }
+    if ($data['mode'] === 'auto' && !empty($data['codes_config'])) {
+        return 'Codes config must be empty for auto mode.';
+    }
+    if ($data['mode'] === 'manual' && !empty($data['campaign_code'])) {
+        return 'Campaign code must be empty for manual mode.';
+    }
+
+    return null;
 }
