@@ -109,4 +109,68 @@ class CampaignEngineTest extends TestCase
         $this->expectException(\RuntimeException::class);
         CampaignEngine::get_active();
     }
+
+    public function testModeExclusivityThrowsForManualWithCampaignCode()
+    {
+        $row = (object)[
+            'id' => 2, 'name' => 'Manual Bad', 'slug' => 'manual-bad',
+            'status' => 'active', 'mode' => 'manual',
+            'start_date' => '2026-06-06 00:00:00',
+            'end_date'   => '2026-06-12 23:59:59',
+            'quota' => 100, 'discount_amount' => '10.00',
+            'campaign_code' => 'BADCODE', // violation: manual mode must not have campaign_code
+            'codes_config'  => null,
+        ];
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        $mockWpdb->shouldReceive('get_row')->once()->andReturn($row);
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $this->expectException(\RuntimeException::class);
+        CampaignEngine::get_active();
+    }
+
+    public function testGetCodesConfigReturnsEmptyArrayWhenNull()
+    {
+        $row = (object)[
+            'id' => 1, 'name' => 'Auto', 'slug' => 'auto',
+            'status' => 'active', 'mode' => 'auto',
+            'start_date' => '2026-01-01 00:00:00',
+            'end_date'   => '2030-01-01 00:00:00',
+            'quota' => 100, 'discount_amount' => '10.00',
+            'campaign_code' => 'CODE', 'codes_config' => null,
+        ];
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        $mockWpdb->shouldReceive('get_row')->once()->andReturn($row);
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $campaign = CampaignEngine::get_active();
+        $this->assertSame([], $campaign->get_codes_config());
+    }
+
+    public function testGetCodesConfigReturnsDecodedArray()
+    {
+        $row = (object)[
+            'id' => 3, 'name' => 'Manual', 'slug' => 'manual',
+            'status' => 'active', 'mode' => 'manual',
+            'start_date' => '2026-01-01 00:00:00',
+            'end_date'   => '2030-01-01 00:00:00',
+            'quota' => 100, 'discount_amount' => '10.00',
+            'campaign_code' => null,
+            'codes_config'  => '{"promo24": 240, "promo12": 240}',
+        ];
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        $mockWpdb->shouldReceive('get_row')->once()->andReturn($row);
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $campaign = CampaignEngine::get_active();
+        $config = $campaign->get_codes_config();
+        $this->assertEquals(240, $config['promo24']);
+        $this->assertEquals(240, $config['promo12']);
+    }
 }
