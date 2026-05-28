@@ -112,6 +112,14 @@ class DB
                 'debug_mode' => false,
             ]);
         }
+
+        self::run_column_migrations();
+
+        self::run_pasif_backfill(
+            (int) (get_option('home_promo_manager_settings')['pasif_date_field_id'] ?? 1698),
+            (int) (get_option('home_promo_manager_settings')['form_id'] ?? 13)
+        );
+        self::ensure_autoload_no();
     }
 
     /**
@@ -635,5 +643,130 @@ class DB
         return ! empty($wpdb->get_var($wpdb->prepare(
             "SHOW COLUMNS FROM `{$table}` LIKE %s", $column
         )));
+    }
+
+    /**
+     * Run guarded ALTER TABLE migrations for new columns.
+     * Each ALTER is only issued if the target column does not already exist.
+     */
+    public static function run_column_migrations(): void {
+        global $wpdb;
+
+        // --- wp_home_promo_counted additions ---
+        if (!self::column_exists("{$wpdb->prefix}home_promo_counted", 'campaign_id')) {
+            $wpdb->query(
+                "ALTER TABLE {$wpdb->prefix}home_promo_counted
+               ADD COLUMN campaign_id INT NULL DEFAULT NULL,
+               ADD COLUMN source VARCHAR(20) NULL DEFAULT 'live',
+               ADD UNIQUE KEY uq_entry_campaign (entry_id, campaign_id),
+               ADD INDEX idx_campaign (campaign_id),
+               ADD INDEX idx_campaign_code (campaign_id, promo_code)"
+            );
+        }
+
+        // --- wp_home_promo_reactivations additions ---
+        if (!self::column_exists("{$wpdb->prefix}home_promo_reactivations", 'went_pasif_at')) {
+            $wpdb->query(
+                "ALTER TABLE {$wpdb->prefix}home_promo_reactivations
+               ADD COLUMN campaign_id INT NULL DEFAULT NULL,
+               ADD COLUMN went_pasif_at DATETIME NULL COMMENT 'UTC'"
+            );
+        }
+
+        // --- InnoDB check for counted table ---
+        $engine = $wpdb->get_var($wpdb->prepare(
+            "SELECT ENGINE FROM information_schema.TABLES
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = %s",
+            "{$wpdb->prefix}home_promo_counted"
+        ));
+        if ($engine && strtolower($engine) !== 'innodb') {
+            $wpdb->query(
+                "ALTER TABLE {$wpdb->prefix}home_promo_counted ENGINE=InnoDB"
+            );
+        }
+    }
+
+    /**
+     * Chunked backfill: seed status_log with 'Pasif' events for all form entries
+     * that have no existing log entry. Runs once, guarded by an option flag.
+     *
+     * @param int $pasif_field_id Field ID holding the pasif date in frm_item_metas
+     * @param int $form_id        Formidable form ID to scan
+     */
+    public static function run_pasif_backfill(int $pasif_field_id, int $form_id): void {
+        global $wpdb;
+
+        if (get_option('hpm_pasif_backfill_done')) {
+            return;
+        }
+
+        $sentinel_date = '1970-01-01 00:00:00';
+        $offset = 0;
+        $chunk  = 1000;
+
+        do {
+            $entries = $wpdb->get_results($wpdb->prepare(
+                "SELECT fi.item_id AS entry_id,
+                    fm.meta_value AS pasif_date_value
+               FROM {$wpdb->prefix}frm_items fi
+          LEFT JOIN {$wpdb->prefix}frm_item_metas fm
+                 ON fm.item_id = fi.item_id AND fm.field_id = %d
+              WHERE fi.form_id = %d
+                AND NOT EXISTS (
+                    SELECT 1 FROM {$wpdb->prefix}home_promo_status_log sl
+                     WHERE sl.entry_id = fi.item_id
+                )
+              LIMIT %d OFFSET %d",
+                $pasif_field_id, $form_id, $chunk, $offset
+            ), ARRAY_A);
+
+            if (empty($entries)) break;
+
+            $wpdb->query('START TRANSACTION');
+            foreach ($entries as $row) {
+                $logged_at = (!empty($row['pasif_date_value']))
+                    ? date('Y-m-d H:i:s', strtotime($row['pasif_date_value']))
+                    : $sentinel_date;
+                $wpdb->query($wpdb->prepare(
+                    "INSERT IGNORE INTO {$wpdb->prefix}home_promo_status_log
+                   (entry_id, from_status, to_status, logged_at)
+                 VALUES (%d, %s, %s, %s)",
+                    (int) $row['entry_id'], 'unknown', 'Pasif', $logged_at
+                ));
+            }
+            $wpdb->query('COMMIT');
+
+            $offset += $chunk;
+        } while (count($entries) === $chunk);
+
+        update_option('hpm_pasif_backfill_done', '1');
+    }
+
+    /**
+     * Ensure the home_promo_manager_settings option exists and has autoload=no.
+     */
+    public static function ensure_autoload_no(): void {
+        global $wpdb;
+        $defaults = [
+            'form_id'               => 13,
+            'daftar_field_id'       => 196,
+            'status_field_id'       => 199,
+            'status_label_field_id' => 1617,
+            'pasif_date_field_id'   => 1698,
+            'promo_field_id'        => 3170,
+        ];
+
+        if (get_option('home_promo_manager_settings') === false) {
+            add_option('home_promo_manager_settings', $defaults, '', 'no');
+        } else {
+            $wpdb->update(
+                $wpdb->options,
+                ['autoload' => 'no'],
+                ['option_name' => 'home_promo_manager_settings']
+            );
+            wp_cache_delete('home_promo_manager_settings', 'options');
+            wp_cache_delete('alloptions', 'options');
+        }
     }
 }

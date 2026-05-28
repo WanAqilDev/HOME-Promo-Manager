@@ -87,6 +87,44 @@ class DBTest extends TestCase
         $this->assertContains('home_promo_status_log', DB::get_new_table_sql_names());
     }
 
+    public function testAlterCountedTableRunsWhenColumnMissing()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        // column_exists for 'campaign_id' → returns null (missing)
+        // column_exists for 'went_pasif_at' → returns 'went_pasif_at' (already present)
+        // InnoDB check → returns 'InnoDB' (no ALTER ENGINE needed)
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        $mockWpdb->shouldReceive('get_var')
+            ->andReturnValues([null, 'went_pasif_at', 'InnoDB']);
+        $mockWpdb->shouldReceive('query')
+            ->with(Mockery::pattern('/ALTER TABLE.*home_promo_counted.*ADD COLUMN campaign_id/s'))
+            ->once()
+            ->andReturn(true);
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        DB::run_column_migrations();
+        $this->assertTrue(true);
+    }
+
+    public function testAlterCountedTableSkipsWhenColumnExists()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        // column_exists for 'campaign_id' → exists
+        // column_exists for 'went_pasif_at' → exists
+        // InnoDB check → 'InnoDB' (no ALTER needed)
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        $mockWpdb->shouldReceive('get_var')
+            ->andReturnValues(['campaign_id', 'went_pasif_at', 'InnoDB']);
+        // ALTER must NOT be called
+        $mockWpdb->shouldNotReceive('query');
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        DB::run_column_migrations();
+        $this->assertTrue(true);
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();
