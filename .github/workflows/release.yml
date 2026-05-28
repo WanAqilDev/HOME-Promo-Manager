@@ -61,30 +61,18 @@ jobs:
           rsync -av \
             --exclude='.git' \
             --exclude='.github' \
+            --exclude='.gitignore' \
+            --exclude='.superpowers' \
             --exclude='node_modules' \
+            --exclude='vendor' \
             --exclude='tests' \
-            --exclude='test-edge-cases.php' \
-            --exclude='test-smart26.php' \
-            --exclude='run-tests.php' \
-            --exclude='debug_*.php' \
             --exclude='.phpunit.result.cache' \
             --exclude='phpunit.xml' \
             --exclude='composer.json' \
             --exclude='composer.lock' \
             --exclude='*.md' \
             --exclude='packages' \
-            --exclude='SMART26_*.md' \
-            --exclude='PR_SUMMARY.md' \
-            --exclude='RELEASE_*.md' \
-            --exclude='TEST_*.md' \
-            --exclude='PARTICIPANT_*.md' \
-            --exclude='ADMIN_*.md' \
-            --exclude='EDGE_*.md' \
-            --exclude='CODEBASE_*.md' \
             ./ packages/$PACKAGE_NAME/ 2>&1 || true
-          
-          # Ensure vendor directory exists (create empty if needed)
-          mkdir -p packages/$PACKAGE_NAME/vendor
           
           # Create zip archive
           cd packages
@@ -101,75 +89,40 @@ jobs:
         run: |
           cat > release-notes.md << 'EOF'
           # HOME Promo Manager v${{ steps.get_version.outputs.VERSION }}
-          
-          ## 🎉 What's New
-          
-          ### SMART26 Dynamic Multi-Code System
-          
-          This release introduces a complete overhaul of the promo code management system with dynamic multi-code support, comprehensive testing infrastructure, and enhanced admin UI.
-          
-          ### ✨ Key Features
-          
-          - **Dynamic Multi-Code Management**: Create unlimited promo codes with individual quotas
-          - **Real-Time Dashboard**: Live AJAX updates every 5 seconds
-          - **Race Condition Prevention**: Atomic database queries prevent over-allocation
-          - **Comprehensive Test Harness**: 18 pre-configured test scenarios
-          - **Backward Compatible**: Full compatibility with existing installations
-          
-          ### 🔧 Installation
-          
+
+          ## What's New
+
+          ### Generic Campaign Engine (v1.0)
+
+          Complete rewrite into a reusable Campaign Promo Engine.
+          Any future campaign (6CURE, Merdeka, Raya) becomes a config row — no code changes needed.
+
+          ### Key Features
+
+          - **Two campaign modes**: Auto (discount applied silently) and Manual (staff enters code, per-code quotas enforced)
+          - **Eligibility engine**: Three participant categories — new, diagnosed, reactivation — determined automatically from form data
+          - **Atomic slot counter**: Race-safe quota enforcement via INSERT IGNORE + transaction guard
+          - **Admin Campaigns tab**: Full CRUD under Settings > HOME Promo Manager
+          - **Real-time REST counter**: `GET /wp-json/promo/v1/counter` returns `{used, max, remaining, active}`
+          - **Shortcode**: `[hpm_counter]` displays live slot count
+          - **Status log**: Plugin-owned Pasif transition log with 2-year retention
+
+          ### Installation / Upgrade
+
           1. Download `home-promo-manager-${{ steps.get_version.outputs.VERSION }}.zip`
-          2. Upload to WordPress via Plugins → Add New → Upload Plugin
-          3. Activate the plugin
-          4. Database tables will auto-create on activation
-          
-          ### 📦 Package Contents
-          
-          - Plugin files (production-ready)
-          - Vendor dependencies (Composer)
-          - Templates and assets
-          
-          ### ⚙️ Requirements
-          
+          2. Upload via Plugins → Add New → Upload Plugin (or use the built-in auto-updater)
+          3. Activate — DB tables auto-create/migrate on activation
+
+          ### Requirements
+
           - WordPress 6.0+
           - PHP 7.4+
           - Formidable Forms Pro
           - MySQL 5.7+ or MariaDB 10.2+
-          
-          ### 🔄 Upgrading from v0.1.x
-          
-          - **Automatic Migration**: Settings migrate automatically
-          - **Database**: Tables auto-create, no manual SQL needed
-          - **No Breaking Changes**: Full backward compatibility
-          
-          ### 📊 Testing
-          
-          - **59/59 automated tests passing**
-          - **18 test scenarios** in integrated test harness
-          - **Race condition tested** with simultaneous requests
-          - **Quota enforcement verified** at capacity limits
-          
-          ### 📝 Documentation
-          
-          See repository for complete documentation:
-          - Implementation guides
-          - Testing procedures
-          - API documentation
-          - Troubleshooting guides
-          
-          ### 🐛 Known Issues
-          
-          None - Production ready ✅
-          
-          ### 👥 Credits
-          
-          **Developed by**: WanAqilDev  
-          **Client**: HOME Math Therapy  
-          **Tech Partner**: QCXIS Sdn Bhd
-          
-          ---
-          
-          **Full Changelog**: https://github.com/WanAqilDev/HOME-Promo-Manager/compare/v0.1.10...v${{ steps.get_version.outputs.VERSION }}
+
+          ### Credits
+
+          Developed by Wan Aqil Hazim, QCXIS Sdn Bhd
           EOF
           
       - name: Create GitHub Release
