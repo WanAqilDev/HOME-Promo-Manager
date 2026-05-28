@@ -220,6 +220,16 @@ if (!function_exists('wp_verify_nonce')) {
     function wp_verify_nonce($nonce, $action = -1) { return 1; }
 }
 
+if (!class_exists('FrmEntryMeta')) {
+    class FrmEntryMeta
+    {
+        public static function update_entry_meta(int $entry_id, int $field_id, $old_value, $new_value): bool
+        {
+            return true;
+        }
+    }
+}
+
 $GLOBALS['wpdb'] = new MockWPDB();
 
 // Load plugin files

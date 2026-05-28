@@ -114,6 +114,46 @@ class HookDispatcherTest extends TestCase
         $this->assertNull($ctx->pasif_days);
     }
 
+    public function testOnAfterUpdateEntryEarlyBailsWhenNotTargetForm()
+    {
+        // Manager defaults to form_id=13; passing form_id=99 → bail immediately
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        // No query calls expected — the method returns before any DB work
+        $mockWpdb->shouldNotReceive('query');
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        HookDispatcher::on_after_update_entry(1, ['form_id' => 99, 'item_meta' => []]);
+        $this->assertTrue(true);
+    }
+
+    public function testPasifTransitionWritesToStatusLog()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        // Verify prepare is called with the INSERT pattern
+        $mockWpdb->shouldReceive('prepare')
+            ->with(Mockery::pattern('/INSERT.*home_promo_status_log/'), 42, 'Aktif')
+            ->once()
+            ->andReturn('sql');
+        $mockWpdb->shouldReceive('query')->with('sql')->once()->andReturn(true);
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        HookDispatcher::write_pasif_log_if_needed(42, 'Aktif', 'Pasif');
+        $this->assertTrue(true);
+    }
+
+    public function testPasifLogSkippedWhenAlreadyPasif()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldNotReceive('query'); // no insert
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        HookDispatcher::write_pasif_log_if_needed(42, 'Pasif', 'Pasif');
+        $this->assertTrue(true);
+    }
+
     public function testBuildCtxComputesPasifDaysWhenLogEntryExists()
     {
         $mockWpdb = Mockery::mock('MockWPDB');
