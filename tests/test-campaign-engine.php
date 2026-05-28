@@ -329,4 +329,30 @@ class CampaignEngineTest extends TestCase
         $result = CampaignEngine::claim_slot($ctx);
         $this->assertEquals('status_divergence', $result['status']);
     }
+
+    public function testClaimSlotReturnsErrorOnDbFailure()
+    {
+        $row = (object)[
+            'id' => 1, 'name' => 'T', 'slug' => 't', 'status' => 'active',
+            'mode' => 'auto', 'start_date' => '2026-01-01 00:00:00',
+            'end_date' => '2030-01-01 00:00:00',
+            'quota' => 100, 'discount_amount' => '10.00',
+            'campaign_code' => 'TEST', 'codes_config' => null,
+        ];
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        $mockWpdb->shouldReceive('get_row')->once()->andReturn($row);
+        $mockWpdb->shouldReceive('get_var')->once()->andReturn('0'); // not counted
+        $mockWpdb->shouldReceive('query')->with('START TRANSACTION')->once()->andReturn(true);
+        $mockWpdb->shouldReceive('query')->with('sql')->once()->andReturn(false); // DB error
+        $mockWpdb->shouldReceive('query')->with('ROLLBACK')->once()->andReturn(true);
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $ctx = (object)['entry_id' => 5, 'daftar' => 'Ya', 'went_pasif_at' => null,
+                        'pasif_days' => null, 'event' => 'created', 'prev_daftar' => null,
+                        'status' => 1, 'status_label' => 'Aktif', 'submitted_code' => null];
+        $result = CampaignEngine::claim_slot($ctx);
+        $this->assertEquals('error', $result['status']);
+    }
 }

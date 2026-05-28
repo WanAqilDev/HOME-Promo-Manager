@@ -248,6 +248,10 @@ class CampaignEngine
                 $ctx->entry_id, $campaign->id, $code_to_write, $category, $source
             ));
 
+            if ($inserted === false) {
+                $wpdb->query('ROLLBACK');
+                return ['status' => 'error'];
+            }
             if ((int) $inserted !== 1) {
                 $wpdb->query('ROLLBACK');
                 return ['status' => 'duplicate'];
