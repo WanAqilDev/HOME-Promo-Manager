@@ -96,6 +96,72 @@ class CampaignEngine
         return $campaign;
     }
 
-    // activate() and deactivate() implemented in Task 5
+    public static function activate(int $campaign_id, int $user_id): array
+    {
+        global $wpdb;
+        $wpdb->query('START TRANSACTION');
+
+        $affected = $wpdb->query($wpdb->prepare(
+            "UPDATE {$wpdb->prefix}home_promo_active
+                SET campaign_id = %d, activated_at = UTC_TIMESTAMP(), activated_by = %d
+              WHERE singleton = 1 AND campaign_id IS NULL",
+            $campaign_id, $user_id
+        ));
+
+        if ($affected === 0) {
+            $current_id = (int) $wpdb->get_var(
+                "SELECT campaign_id FROM {$wpdb->prefix}home_promo_active WHERE singleton = 1"
+            );
+            if ($current_id === $campaign_id) {
+                // Idempotent — already pointing at our campaign
+                $wpdb->query($wpdb->prepare(
+                    "UPDATE {$wpdb->prefix}home_promo_campaigns SET status = 'active' WHERE id = %d",
+                    $campaign_id
+                ));
+                $wpdb->query('COMMIT');
+                self::flush();
+                return ['status' => 'ok'];
+            }
+            $wpdb->query('ROLLBACK');
+            return ['status' => 'conflict', 'conflict_id' => $current_id];
+        }
+
+        $wpdb->query($wpdb->prepare(
+            "UPDATE {$wpdb->prefix}home_promo_campaigns SET status = 'active' WHERE id = %d",
+            $campaign_id
+        ));
+        $wpdb->query($wpdb->prepare(
+            "UPDATE {$wpdb->prefix}home_promo_campaigns
+                SET status = 'paused' WHERE id <> %d AND status = 'active'",
+            $campaign_id
+        ));
+        $wpdb->query('COMMIT');
+        self::flush();
+        return ['status' => 'ok'];
+    }
+
+    public static function deactivate(int $campaign_id, int $user_id): array
+    {
+        global $wpdb;
+        $wpdb->query('START TRANSACTION');
+
+        $wpdb->query($wpdb->prepare(
+            "UPDATE {$wpdb->prefix}home_promo_active
+                SET campaign_id = NULL, activated_at = UTC_TIMESTAMP(), activated_by = %d
+              WHERE singleton = 1 AND campaign_id = %d",
+            $user_id, $campaign_id
+        ));
+
+        $wpdb->query($wpdb->prepare(
+            "UPDATE {$wpdb->prefix}home_promo_campaigns
+                SET status = 'paused' WHERE id = %d AND status = 'active'",
+            $campaign_id
+        ));
+
+        $wpdb->query('COMMIT');
+        self::flush();
+        return ['status' => 'ok'];
+    }
+
     // claim_slot() implemented in Task 8
 }

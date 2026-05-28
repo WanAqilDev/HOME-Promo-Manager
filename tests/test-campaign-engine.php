@@ -173,4 +173,75 @@ class CampaignEngineTest extends TestCase
         $this->assertEquals(240, $config['promo24']);
         $this->assertEquals(240, $config['promo12']);
     }
+
+    public function testActivateSucceedsWhenPointerIsNull()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        // START TRANSACTION, UPDATE pointer (1 row affected), UPDATE campaigns set active, UPDATE others set paused, COMMIT = 5 calls
+        $mockWpdb->shouldReceive('query')->times(5)->andReturn(1);
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $result = CampaignEngine::activate(1, 99);
+        $this->assertEquals('ok', $result['status']);
+    }
+
+    public function testActivateRejectsWhenAnotherCampaignIsActive()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        $mockWpdb->shouldReceive('query')
+            ->with('START TRANSACTION')->once()->andReturn(true);
+        // UPDATE returns 0 (pointer is occupied by another campaign)
+        $mockWpdb->shouldReceive('query')
+            ->with('sql')->once()->andReturn(0);
+        // Re-SELECT: returns different campaign id (7, not 1)
+        $mockWpdb->shouldReceive('get_var')->once()->andReturn('7');
+        // ROLLBACK
+        $mockWpdb->shouldReceive('query')
+            ->with('ROLLBACK')->once()->andReturn(true);
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $result = CampaignEngine::activate(1, 99);
+        $this->assertEquals('conflict', $result['status']);
+        $this->assertEquals(7, $result['conflict_id']);
+    }
+
+    public function testActivateIsIdempotentWhenAlreadyActive()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        $mockWpdb->shouldReceive('query')
+            ->with('START TRANSACTION')->once()->andReturn(true);
+        // UPDATE returns 0 (pointer already set)
+        $mockWpdb->shouldReceive('query')
+            ->with('sql')->once()->andReturn(0);
+        // Re-SELECT: same campaign_id = 1 (idempotent)
+        $mockWpdb->shouldReceive('get_var')->once()->andReturn('1');
+        // UPDATE to set active status + COMMIT
+        $mockWpdb->shouldReceive('query')
+            ->with('sql')->once()->andReturn(1);
+        $mockWpdb->shouldReceive('query')
+            ->with('COMMIT')->once()->andReturn(true);
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $result = CampaignEngine::activate(1, 99);
+        $this->assertEquals('ok', $result['status']);
+    }
+
+    public function testDeactivateIsIdempotent()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        // START TRANSACTION, UPDATE pointer (0 = already null), UPDATE status, COMMIT — all queries succeed
+        $mockWpdb->shouldReceive('query')->andReturn(0);
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $result = CampaignEngine::deactivate(1, 99);
+        $this->assertEquals('ok', $result['status']);
+    }
 }
