@@ -36,6 +36,7 @@ class Manager
             'daftar_field_id' => 196,
             'daftar_trigger_value' => 'Ya',
             'status_field_id' => 199,
+            'status_label_field_id' => 1617,
             'pasif_date_field_id' => 1698,
             'max' => 480,
             'tier1_max' => 240,

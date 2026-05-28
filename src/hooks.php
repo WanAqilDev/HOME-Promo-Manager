@@ -1,563 +1,169 @@
 <?php
 namespace HPM;
 
-if (!defined('ABSPATH'))
-    exit;
+if (!defined('ABSPATH')) exit;
 
-// Basic Formidable hooks wiring
+class HookDispatcher
+{
+    const SENTINEL_UNSET = "\0HPM_UNSET";
 
-require_once __DIR__ . '/utils.php';
+    /**
+     * @var array<int, array<int, string|null>> [$entry_id][$field_id] => value
+     * A missing key means "pre-hook never ran" (use fallback SELECT).
+     * An explicit null means "pre-hook ran, DB value was null".
+     */
+    private static array $snapshot = [];
 
-// VALIDATION: Pre-submission validation for SMART26 promo codes
-add_filter('frm_validate_entry', function ($errors, $values) {
-    $mgr = Manager::get_instance();
-    $form_id = !empty($values['form_id']) ? (int) $values['form_id'] : 0;
-    $entry_id = !empty($values['id']) ? (int) $values['id'] : 0;
-    
-    if ($form_id !== (int) $mgr->s('form_id')) {
-        return $errors;
+    /** @var array<int,bool> reentrancy guard */
+    private static array $writing_field = [];
+
+    public static function init(): void
+    {
+        add_filter('frm_validate_entry',     [self::class, 'on_validate_entry'],     10, 2);
+        add_action('frm_after_create_entry', [self::class, 'on_after_create_entry'], 10, 2);
+        add_action('frm_pre_update_entry',   [self::class, 'on_pre_update_entry'],   10, 2);
+        add_action('frm_after_update_entry', [self::class, 'on_after_update_entry'], 10, 2);
     }
 
-    // Only validate if promo is active
-    if (!$mgr->is_active()) {
-        return $errors;
+    // -----------------------------------------------------------------
+    // Pre-hook snapshot
+    // -----------------------------------------------------------------
+
+    public static function on_pre_update_entry(int $entry_id, array $values): void
+    {
+        global $wpdb;
+        $mgr = Manager::get_instance();
+
+        $field_ids = [
+            (int) $mgr->s('daftar_field_id'),
+            (int) $mgr->s('status_field_id'),
+            (int) $mgr->s('status_label_field_id'),
+            (int) $mgr->s('pasif_date_field_id'),
+        ];
+
+        foreach ($field_ids as $field_id) {
+            $value = $wpdb->get_var($wpdb->prepare(
+                "SELECT meta_value FROM {$wpdb->prefix}frm_item_metas
+                  WHERE item_id = %d AND field_id = %d LIMIT 1",
+                $entry_id, $field_id
+            ));
+            self::$snapshot[$entry_id][$field_id] = $value; // null is legitimate
+        }
     }
 
-    // Only validate in manual (SMART26) mode
-    $mode = $mgr->s('code_assignment_mode') ?: 'manual';
-    if ($mode !== 'manual') {
-        return $errors; // Skip validation in auto mode
-    }
+    public static function get_field_snapshot_or_fallback(int $entry_id, int $field_id): ?string
+    {
+        global $wpdb;
 
-    $promo_field = (string) $mgr->s('promo_field_id');
-    $new_code = !empty($values['item_meta'][$promo_field]) ? trim($values['item_meta'][$promo_field]) : '';
-    
-    // ============================================
-    // EDIT MODE: Entry exists in promo table
-    // ============================================
-    if ($entry_id > 0) {
-        $exists_in_promo_table = DB::entry_exists($entry_id);
-        
-        // Enhanced debug logging
-        error_log(sprintf(
-            '[HPM-DEBUG] Validation Check - Entry ID: %d, Exists in promo table: %s, Promo field: %s',
-            $entry_id,
-            $exists_in_promo_table ? 'YES' : 'NO',
-            $promo_field
+        if (array_key_exists($field_id, self::$snapshot[$entry_id] ?? [])) {
+            return self::$snapshot[$entry_id][$field_id];
+        }
+
+        // Pre-hook missed — do fallback SELECT
+        $value = $wpdb->get_var($wpdb->prepare(
+            "SELECT meta_value FROM {$wpdb->prefix}frm_item_metas
+              WHERE item_id = %d AND field_id = %d LIMIT 1",
+            $entry_id, $field_id
         ));
-        
-        if ($exists_in_promo_table) {
-            $entry_data = DB::get_entry_data($entry_id);
-            $old_code = isset($entry_data['promo_code']) ? trim($entry_data['promo_code']) : '';
-            
-            // CRITICAL FIX: If $new_code is empty, get it from entry meta (field might be readonly/disabled)
-            if (empty($new_code)) {
-                $new_code = ff_get_entry_meta($entry_id, (int)$promo_field);
-                $new_code = is_string($new_code) ? trim($new_code) : '';
-            }
-            
-            // Normalize both codes for comparison
-            $old_code_normalized = strtoupper(trim($old_code));
-            $new_code_normalized = strtoupper(trim($new_code));
-            
-            error_log(sprintf(
-                '[HPM-VALIDATE-EDIT] Entry #%d - Old: "%s" (%s), New: "%s" (%s), Match: %s',
-                $entry_id, 
-                $old_code, $old_code_normalized,
-                $new_code, $new_code_normalized,
-                ($old_code_normalized === $new_code_normalized) ? 'YES' : 'NO'
-            ));
-            
-            // Rule 1: If code unchanged (case-insensitive), allow all edits
-            if ($old_code_normalized === $new_code_normalized) {
-                error_log('[HPM-VALIDATE-EDIT] ✓ Code unchanged - ALLOWING EDIT');
-                return $errors; // ALLOW - no validation needed
-            }
-            
-            // Rule 2: Block ANY code changes during promo period
-            error_log(sprintf(
-                '[HPM-VALIDATE-EDIT] ✗ Code change attempt - BLOCKING (Old: %s → New: %s)',
-                $old_code, $new_code
-            ));
-            
-            if (!isset($errors['field' . $promo_field])) {
-                $errors['field' . $promo_field] = '';
-            }
-            $errors['field' . $promo_field] = 'Kod promo tidak boleh ditukar selepas pendaftaran.';
-            
-            return $errors;
-        }
-    }
-    
-    // ============================================
-    // NEW REGISTRATION MODE
-    // ============================================
-    
-    // Check if user wants to register (Daftar = Ya)
-    $daftar_field = (string) $mgr->s('daftar_field_id');
-    $trigger_val = $mgr->s('daftar_trigger_value') ?: 'Ya';
-    $daftar_val = !empty($values['item_meta'][$daftar_field]) ? $values['item_meta'][$daftar_field] : '';
-
-    if ($daftar_val !== $trigger_val) {
-        return $errors; // Not registering, skip validation
+        self::$snapshot[$entry_id][$field_id] = $value;
+        return $value;
     }
 
-    // CRITICAL: Reject legacy codes for new registrations
-    $legacy_codes = ['tiada', 'promo24', 'promo12', 'Tiada', 'TIADA', 'PROMO24', 'PROMO12'];
-    
-    if (in_array($new_code, $legacy_codes, true)) {
-        if (!isset($errors['field' . $promo_field])) {
-            $errors['field' . $promo_field] = '';
-        }
-        $errors['field' . $promo_field] = 'Kod promo ini tidak sah untuk pendaftaran baru. Sila gunakan kod SMART26 yang aktif.';
-        
-        if ($mgr->s('debug_mode')) {
-            error_log('[HPM-VALIDATE-NEW] Legacy code rejected: ' . $new_code);
-        }
-        return $errors;
+    public static function stash_snapshot(int $entry_id, int $field_id, ?string $value): void
+    {
+        self::$snapshot[$entry_id][$field_id] = $value;
     }
 
-    // Require code for new registrations during promo
-    if (empty($new_code)) {
-        if (!isset($errors['field' . $promo_field])) {
-            $errors['field' . $promo_field] = '';
-        }
-        $errors['field' . $promo_field] = 'Sila masukkan kod promo SMART26.';
-        
-        if ($mgr->s('debug_mode')) {
-            error_log('[HPM-VALIDATE-NEW] Empty code rejected');
-        }
-        return $errors;
-    }
+    // -----------------------------------------------------------------
+    // $ctx builder
+    // -----------------------------------------------------------------
 
-    if ($mgr->s('debug_mode')) {
-        error_log(sprintf(
-            '[HPM-VALIDATE-NEW] New registration - Code: %s, Daftar: %s',
-            $new_code, $daftar_val
+    private static function build_ctx(string $event, int $entry_id, array $post_values): object
+    {
+        global $wpdb;
+        $mgr = Manager::get_instance();
+
+        $daftar_fid       = (int) $mgr->s('daftar_field_id');
+        $status_fid       = (int) $mgr->s('status_field_id');
+        $status_label_fid = (int) $mgr->s('status_label_field_id');
+        $pasif_fid        = (int) $mgr->s('pasif_date_field_id');
+        $promo_fid        = (int) $mgr->s('promo_field_id');
+
+        // New values come from $post_values['item_meta']
+        $daftar       = $post_values['item_meta'][$daftar_fid]       ?? null;
+        $status       = $post_values['item_meta'][$status_fid]       ?? null;
+        $status_label = $post_values['item_meta'][$status_label_fid] ?? null;
+
+        // Previous values from snapshot (null for 'created' events)
+        $prev_daftar       = ($event === 'created') ? null : self::get_field_snapshot_or_fallback($entry_id, $daftar_fid);
+        $prev_status       = ($event === 'created') ? null : self::get_field_snapshot_or_fallback($entry_id, $status_fid);
+        $prev_status_label = ($event === 'created') ? null : self::get_field_snapshot_or_fallback($entry_id, $status_label_fid);
+
+        // Pasif history: log → snapshot fallback → null
+        $went_pasif_at = $wpdb->get_var($wpdb->prepare(
+            "SELECT logged_at FROM {$wpdb->prefix}home_promo_status_log
+              WHERE entry_id = %d ORDER BY logged_at DESC LIMIT 1",
+            $entry_id
         ));
-    }
+        if ($went_pasif_at === null) {
+            $went_pasif_at = self::get_field_snapshot_or_fallback($entry_id, $pasif_fid);
+        }
 
-    // Validate the code (quota check happens in Manager::validate_code)
-    $validation = $mgr->validate_code($new_code);
-    
-    if (!$validation['valid']) {
-        if (!isset($errors['field' . $promo_field])) {
-            $errors['field' . $promo_field] = '';
-        }
-        $errors['field' . $promo_field] = $validation['message'];
-        
-        if ($mgr->s('debug_mode')) {
-            error_log('[HPM-VALIDATE-NEW] Validation failed: ' . $validation['message']);
-        }
-    } else {
-        if ($mgr->s('debug_mode')) {
-            error_log('[HPM-VALIDATE-NEW] Code validated: ' . $validation['message']);
-        }
-    }
-
-    return $errors;
-}, 10, 2);
-
-// NEW REGISTRATION: Handle new entries when form is submitted
-add_action('frm_after_create_entry', function ($entry_id, $form_id) {
-    $mgr = Manager::get_instance();
-    if ((int) $form_id !== (int) $mgr->s('form_id'))
-        return;
-    if (!$mgr->is_active())
-        return;
-    
-    $daftar_field = (int) $mgr->s('daftar_field_id');
-    $trigger_val = $mgr->s('daftar_trigger_value') ?: 'Ya';
-    $daftar_val = ff_get_entry_meta($entry_id, $daftar_field);
-    
-    if ($daftar_val !== $trigger_val) {
-        return; // Not registering for promo
-    }
-
-    // Get code assignment mode
-    $mode = $mgr->s('code_assignment_mode') ?: 'manual';
-    
-    if ($mode === 'auto') {
-        // Legacy auto-assign mode
-        $mgr->record_activation($entry_id);
-        if ($mgr->s('debug_mode')) {
-            error_log('[HPM-CREATE] Auto mode - activation recorded for entry ' . $entry_id);
-        }
-    } else {
-        // SMART26 manual mode with code validation
-        $promo_field = (int) $mgr->s('promo_field_id');
-        $code = ff_get_field_value_robust($entry_id, $promo_field);
-        
-        // Get branch selection
-        $branch_field = (int) $mgr->s('branch_field_id');
-        $branch = $branch_field ? ff_get_field_value_robust($entry_id, $branch_field) : '';
-        
-        // Determine category based on entry data
-        $category = 'new'; // Default to new registration
-        
-        // Check if diagnostic (has recent diagnostic date)
-        $diagnostic_field = (int) $mgr->s('diagnostic_date_field_id');
-        if ($diagnostic_field) {
-            $diagnostic_date = ff_get_field_value_robust($entry_id, $diagnostic_field);
-            if (!empty($diagnostic_date)) {
-                // Check if within 90 days
-                try {
-                    $tz = new \DateTimeZone($mgr->s('timezone') ?: 'Asia/Kuala_Lumpur');
-                    $diag_dt = new \DateTime($diagnostic_date, $tz);
-                    $now = new \DateTime('now', $tz);
-                    $days_since = ($now->getTimestamp() - $diag_dt->getTimestamp()) / 86400;
-                    if ($days_since <= 90) {
-                        $category = 'diagnostic';
-                    }
-                } catch (\Exception $e) {
-                    // Ignore date parsing errors
-                }
-            }
-        }
-        
-        // Check if lead
-        $lead_field = (int) $mgr->s('lead_status_field_id');
-        if ($lead_field && $category === 'new') { // Only check if not already categorized
-            $lead_status = ff_get_field_value_robust($entry_id, $lead_field);
-            if ($lead_status === 'Lead' || $lead_status === 'lead') {
-                $category = 'lead';
-            }
-        }
-        
-        if ($mgr->s('debug_mode')) {
-            error_log(sprintf(
-                '[HPM-CREATE] SMART26 mode - Entry: %d, Code: %s, Branch: %s, Category: %s',
-                $entry_id, $code, $branch, $category
+        $pasif_days = null;
+        if ($went_pasif_at !== null) {
+            $pasif_days = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT TIMESTAMPDIFF(DAY, %s, UTC_TIMESTAMP())",
+                $went_pasif_at
             ));
         }
-        
-        // CRITICAL: Reject legacy codes and empty codes during active promo
-        $legacy_codes = ['tiada', 'promo24', 'promo12', 'Tiada', 'TIADA', 'PROMO24', 'PROMO12'];
-        if (empty($code) || in_array($code, $legacy_codes, true)) {
-            if ($mgr->s('debug_mode')) {
-                error_log('[HPM-CREATE] Invalid/legacy code rejected: ' . $code);
-            }
-            // DO NOT TRACK - validation should have caught this
-            return;
-        }
-        
-        // Validate and record with SMART26 system (only if code provided)
-        $result = $mgr->validate_and_record($code, $entry_id, $branch, $category);
-        
-        if ($result['success']) {
-            if ($mgr->s('debug_mode')) {
-                error_log('[HPM-CREATE] SMART26 registration successful: ' . $result['message']);
-            }
-        } else {
-            if ($mgr->s('debug_mode')) {
-                error_log('[HPM-CREATE] SMART26 registration failed: ' . $result['message']);
-            }
-            // Error already logged, validation should have caught this
-        }
-    }
-}, 10, 2);
 
-// REMOVED: Do not auto-fill promo code with legacy values during SMART26
-// Users must explicitly enter a valid SMART26 code or leave it empty
-add_filter('frm_pre_create_entry', function ($values) {
-    $mgr = Manager::get_instance();
-    $form_id = !empty($values['form_id']) ? (int) $values['form_id'] : 0;
-    if ($form_id !== (int) $mgr->s('form_id'))
-        return $values;
-    
-    // During SMART26 promo, do NOT auto-fill with 'Tiada'
-    // Let validation handle empty codes
-    if (!isset($values['item_meta']) || !is_array($values['item_meta']))
-        $values['item_meta'] = [];
-    
-    // NOTE: Previously auto-filled with 'Tiada' in legacy mode
-    // Now disabled to enforce explicit code entry during SMART26 promo
-    // Validation will require code if Daftar=Ya
-    return $values;
-});
-
-// AUTO-SET PASIF DATE: When status changes to pasif (2), automatically set the pasif date to today
-add_action('frm_after_update_entry', function ($entry_id, $form_id) {
-    $mgr = Manager::get_instance();
-
-    // Only run for Form 13
-    if ((int) $form_id !== (int) $mgr->s('form_id'))
-        return;
-
-    $status_field = (int) $mgr->s('status_field_id');
-    $pasif_field = (int) $mgr->s('pasif_date_field_id');
-
-    if (!$status_field || !$pasif_field)
-        return;
-
-    // Get current status
-    $current_status = ff_get_field_value_robust($entry_id, $status_field);
-
-    error_log('[HPM Auto-Date] Entry ' . $entry_id . ' status: ' . var_export($current_status, true));
-
-    // If status is pasif (2), ensure pasif date is set to today
-    if ($current_status === '2') {
-        $existing_pasif_date = ff_get_field_value_robust($entry_id, $pasif_field);
-
-        // Only update if empty or doesn't exist yet
-        if (empty($existing_pasif_date)) {
-            $today = date('Y-m-d');
-            error_log('[HPM Auto-Date] Setting pasif date to ' . $today . ' for entry ' . $entry_id);
-            ff_update_entry_meta($entry_id, $pasif_field, $today);
-        } else {
-            error_log('[HPM Auto-Date] Pasif date already set to ' . $existing_pasif_date . ' - keeping existing date');
-        }
-    }
-}, 5, 2);
-
-
-
-// REACTIVATION: Capture previous meta BEFORE any database update
-// REACTIVATION: Capture previous meta BEFORE any database update
-// Priority 5 to run early before Formidable updates the meta
-add_action('frm_pre_update_entry', function ($values, $entry_id) {
-    $mgr = Manager::get_instance();
-
-    // Formidable passes ($values, $id)
-    // $values is the array of submitted data
-    // $entry_id is the ID of the entry being updated
-
-    $form_id = isset($values['form_id']) ? (int) $values['form_id'] : 0;
-    $entry_id = (int) $entry_id;
-
-    if ($mgr->s('debug_mode')) {
-        error_log(sprintf('[HPM-DEBUG] Pre-update triggered. Entry: %d, Form: %d', $entry_id, $form_id));
+        return (object) [
+            'event'             => $event,
+            'entry_id'          => $entry_id,
+            'daftar'            => $daftar,
+            'prev_daftar'       => $prev_daftar,
+            'status'            => ($status !== null) ? (int) $status : null,
+            'prev_status'       => ($prev_status !== null) ? (int) $prev_status : null,
+            'status_label'      => $status_label,
+            'prev_status_label' => $prev_status_label,
+            'went_pasif_at'     => $went_pasif_at,
+            'pasif_days'        => $pasif_days,
+            'submitted_code'    => $post_values['item_meta'][$promo_fid] ?? null,
+        ];
     }
 
-    if ($form_id !== (int) $mgr->s('form_id')) {
-        return $values;
+    // -----------------------------------------------------------------
+    // Test helpers — used by tests to inspect/reset state
+    // -----------------------------------------------------------------
+
+    public static function reset_snapshot(): void { self::$snapshot = []; }
+
+    public static function get_snapshot_for_test(int $entry_id): array
+    {
+        return self::$snapshot[$entry_id] ?? [];
     }
 
-    if ($mgr->s('debug_mode')) {
-        error_log('[HPM-DEBUG] Capturing OLD values for entry ' . $entry_id);
+    // -----------------------------------------------------------------
+    // Hook handlers (stubs — filled in Tasks 9 and 10)
+    // -----------------------------------------------------------------
+
+    public static function on_validate_entry(array $errors, array $values): array
+    {
+        return $errors; // Filled in Task 10
     }
 
-    // Get current (old) values directly from database BEFORE update
-    $status_field = (int) $mgr->s('status_field_id');
-    $pasif_field = (int) $mgr->s('pasif_date_field_id');
-
-    $old_status = ff_get_field_value_robust($entry_id, $status_field);
-    $old_pasif = ff_get_field_value_robust($entry_id, $pasif_field);
-
-    $daftar_field = (int) $mgr->s('daftar_field_id');
-    $old_daftar = ff_get_field_value_robust($entry_id, $daftar_field);
-
-    if ($mgr->s('debug_mode')) {
-        error_log(sprintf('[HPM-DEBUG] Captured OLD: Status=%s, PasifDate=%s', var_export($old_status, true), var_export($old_pasif, true)));
+    public static function on_after_create_entry(int $entry_id, int $form_id): void
+    {
+        // Filled in Task 9
     }
 
-    $prev_data = [
-        'status' => $old_status,
-        'pasif_date' => $old_pasif,
-        'daftar' => $old_daftar,
-    ];
-
-    // Use 5-minute expiry
-    set_transient('hpm_prev_meta_' . $entry_id, $prev_data, 300);
-
-    return $values;
-}, 5, 2);
-
-// After update: detect reactivation
-add_action('frm_after_update_entry', function ($entry_id, $form_id) {
-    $mgr = Manager::get_instance();
-
-    if ($mgr->s('debug_mode')) {
-        error_log(sprintf('[HPM-DEBUG] Post-update triggered. Entry: %d, Form: %d', $entry_id, $form_id));
+    public static function on_after_update_entry(int $entry_id, array $values): void
+    {
+        // Filled in Task 9
     }
+}
 
-    // Form 13 is used for BOTH new registrations AND edits/reactivations
-    if ((int) $form_id !== (int) $mgr->s('form_id')) {
-        return;
-    }
-
-    if (!$mgr->is_active()) {
-        if ($mgr->s('debug_mode'))
-            error_log('[HPM-DEBUG] Promo not active. Skipping.');
-        return;
-    }
-
-    // Check if already reactivated (prevent duplicates)
-    if (DB::has_reactivation($entry_id)) {
-        if ($mgr->s('debug_mode'))
-            error_log('[HPM-DEBUG] Already reactivated. Skipping.');
-        delete_transient('hpm_prev_meta_' . $entry_id);
-        return;
-    }
-
-    $prev = get_transient('hpm_prev_meta_' . $entry_id) ?: [];
-    delete_transient('hpm_prev_meta_' . $entry_id);
-
-    if (empty($prev)) {
-        if ($mgr->s('debug_mode'))
-            error_log('[HPM-DEBUG] No previous meta found (transient missing/expired).');
-        return;
-    }
-
-    $old_status = $prev['status'] ?? null;
-    $old_status = $prev['status'] ?? null;
-    $old_pasif = $prev['pasif_date'] ?? null;
-    $old_daftar = $prev['daftar'] ?? null;
-
-    if ($mgr->s('debug_mode')) {
-        error_log(sprintf('[HPM-DEBUG] Retrieved OLD from transient: Status=%s, PasifDate=%s', var_export($old_status, true), var_export($old_pasif, true)));
-    }
-
-    // Get new status
-    $status_field = (int) $mgr->s('status_field_id');
-    $new_status = ff_get_field_value_robust($entry_id, $status_field);
-
-    if ($mgr->s('debug_mode')) {
-        error_log(sprintf('[HPM-DEBUG] Retrieved NEW: Status=%s', var_export($new_status, true)));
-    }
-
-    // Check reactivation conditions: status changed from 2 to 1, has pasif date, and > 90 days
-    if ($old_status === '2' && $new_status === '1' && !empty($old_pasif)) {
-        if ($mgr->s('debug_mode'))
-            error_log('[HPM-DEBUG] Status change 2->1 detected. Checking date...');
-
-        $tz_string = $mgr->s('timezone') ?: 'Asia/Kuala_Lumpur';
-        try {
-            $tz = new \DateTimeZone($tz_string);
-        } catch (\Exception $e) {
-            $tz = new \DateTimeZone('Asia/Kuala_Lumpur');
-        }
-
-        try {
-            $dt = \DateTime::createFromFormat('Y-m-d H:i:s', $old_pasif, $tz);
-            if (!$dt)
-                $dt = new \DateTime($old_pasif, $tz);
-            $pasif_ts = $dt->getTimestamp();
-        } catch (\Exception $e) {
-            $pasif_ts = 0;
-        }
-
-        $days_inactive = $pasif_ts ? ((time() - $pasif_ts) / 86400) : 0;
-
-        if ($mgr->s('debug_mode'))
-            error_log(sprintf('[HPM-DEBUG] Days inactive: %.2f', $days_inactive));
-
-        // Edge Case: Partial Registration
-        // If pasif_date is the same day as entry creation date, it means they partially registered.
-        // We should allow them to activate even if < 90 days.
-        $is_partial = false;
-        $entry = \FrmEntry::getOne($entry_id);
-        if ($entry && !empty($entry->created_at)) {
-            try {
-                $created_dt = new \DateTime($entry->created_at, new \DateTimeZone('UTC')); // DB is usually UTC
-                $created_dt->setTimezone($tz); // Convert to configured TZ
-
-                // $dt is the pasif_date object created earlier
-                if ($dt && $created_dt->format('Y-m-d') === $dt->format('Y-m-d')) {
-                    $is_partial = true;
-                    if ($mgr->s('debug_mode'))
-                        error_log('[HPM-DEBUG] Partial registration detected (Created == PasifDate). Bypassing 90-day check.');
-                }
-            } catch (\Exception $e) {
-                error_log('[HPM-DEBUG] Error checking partial registration dates: ' . $e->getMessage());
-            }
-        }
-
-        if ($days_inactive > 90 || $is_partial) {
-            if ($mgr->s('debug_mode'))
-                error_log('[HPM-DEBUG] QUALIFIED! Triggering reactivation.');
-            
-            // Check if entry already exists in promo table (has been counted before)
-            $already_counted = DB::entry_exists($entry_id);
-            
-            if ($already_counted) {
-                // Entry exists - check legacy status
-                $is_legacy = DB::is_legacy_entry($entry_id);
-                $entry_data = DB::get_entry_data($entry_id);
-                $existing_code = $entry_data['promo_code'] ?? '';
-                
-                if ($mgr->s('debug_mode')) {
-                    error_log(sprintf(
-                        '[HPM-REACTIVATE] Entry exists - Code: %s, Legacy: %s',
-                        $existing_code,
-                        $is_legacy ? 'YES' : 'NO'
-                    ));
-                }
-                
-                // Record reactivation with existing code (don't change it)
-                $mgr->record_reactivation($entry_id, $old_status, $new_status, $old_pasif, $existing_code);
-                
-            } else {
-                // New reactivation - needs code validation
-                $mode = $mgr->s('code_assignment_mode') ?: 'manual';
-                $user_code = '';
-                
-                if ($mode === 'manual') {
-                    // In SMART26 mode, get the code from the entry
-                    $promo_field = (int) $mgr->s('promo_field_id');
-                    $user_code = ff_get_field_value_robust($entry_id, $promo_field);
-                    
-                    if ($mgr->s('debug_mode')) {
-                        error_log(sprintf('[HPM-REACTIVATE] New reactivation with code: %s', $user_code));
-                    }
-                }
-                
-                // Process reactivation (quota check will apply)
-                $mgr->record_reactivation($entry_id, $old_status, $new_status, $old_pasif, $user_code);
-            }
-        } else {
-            if ($mgr->s('debug_mode'))
-                error_log('[HPM-DEBUG] Not qualified (<= 90 days and not partial).');
-        }
-    } else {
-        if ($mgr->s('debug_mode'))
-            error_log('[HPM-DEBUG] Conditions not met.');
-    }
-
-    // Check for Daftar status change (Tidak -> Ya)
-    // This handles users who initially said "Tidak" but changed to "Ya" later
-    $daftar_field = (int) $mgr->s('daftar_field_id');
-    $new_daftar = ff_get_field_value_robust($entry_id, $daftar_field);
-    $trigger_val = $mgr->s('daftar_trigger_value') ?: 'Ya';
-
-    if ($new_daftar === $trigger_val && $old_daftar !== $trigger_val) {
-        if ($mgr->s('debug_mode')) {
-            error_log(sprintf('[HPM-DEBUG] Daftar status changed from %s to %s. Triggering activation.', var_export($old_daftar, true), var_export($new_daftar, true)));
-        }
-        
-        // Check if already counted to avoid duplicates
-        if (DB::entry_exists($entry_id)) {
-            if ($mgr->s('debug_mode')) {
-                error_log('[HPM-DEBUG] Entry already counted - skipping duplicate activation');
-            }
-        } else {
-            $mode = $mgr->s('code_assignment_mode') ?: 'manual';
-            
-            if ($mode === 'auto') {
-                // Legacy auto mode
-                $mgr->record_activation($entry_id);
-            } else {
-                // SMART26 mode - get code and validate
-                $promo_field = (int) $mgr->s('promo_field_id');
-                $code = ff_get_field_value_robust($entry_id, $promo_field);
-                
-                if (empty($code)) {
-                    if ($mgr->s('debug_mode')) {
-                        error_log('[HPM-DEBUG] Daftar activation skipped - no code provided');
-                    }
-                } else {
-                    // Get branch and category
-                    $branch_field = (int) $mgr->s('branch_field_id');
-                    $branch = $branch_field ? ff_get_field_value_robust($entry_id, $branch_field) : '';
-                    $category = 'new'; // Default for Daftar change
-                    
-                    $result = $mgr->validate_and_record($code, $entry_id, $branch, $category);
-                    
-                    if ($mgr->s('debug_mode')) {
-                        error_log('[HPM-DEBUG] Daftar activation result: ' . $result['message']);
-                    }
-                }
-            }
-        }
-    }
-}, 10, 2);
+// Wire up hooks on WordPress init (not in tests — ABSPATH guard above protects this)
+if (defined('ABSPATH')) {
+    add_action('init', ['HPM\\HookDispatcher', 'init']);
+}

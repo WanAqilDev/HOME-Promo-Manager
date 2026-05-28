@@ -12,6 +12,7 @@
             <file>tests/test-manager.php</file>
             <file>tests/test-campaign-engine.php</file>
             <file>tests/test-eligibility.php</file>
+            <file>tests/test-hooks.php</file>
         </testsuite>
     </testsuites>
 </phpunit>
