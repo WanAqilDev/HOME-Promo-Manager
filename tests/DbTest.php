@@ -125,6 +125,42 @@ class DBTest extends TestCase
         $this->assertTrue(true);
     }
 
+    public function testRunPasifBackfillDoesNothingWhenNoEntries()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        // get_results returns empty on first call → no transaction needed
+        $mockWpdb->shouldReceive('get_results')->once()->andReturn([]);
+        $mockWpdb->shouldNotReceive('query'); // no START TRANSACTION, no INSERT, no COMMIT
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        DB::run_pasif_backfill(1698, 13);
+        $this->assertTrue(true);
+    }
+
+    public function testRunPasifBackfillWritesOneChunk()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+
+        // First call: 1 entry; second call: empty (done)
+        $mockWpdb->shouldReceive('get_results')
+            ->andReturnValues([
+                [['entry_id' => '42', 'pasif_date_value' => '2026-01-15 10:00:00']],
+                [],
+            ]);
+
+        $mockWpdb->shouldReceive('query')->with('START TRANSACTION')->once()->andReturn(true);
+        $mockWpdb->shouldReceive('query')->with('sql')->once()->andReturn(true); // INSERT IGNORE
+        $mockWpdb->shouldReceive('query')->with('COMMIT')->once()->andReturn(true);
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        DB::run_pasif_backfill(1698, 13);
+        $this->assertTrue(true);
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();

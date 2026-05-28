@@ -702,8 +702,7 @@ class DB
         }
 
         $sentinel_date = '1970-01-01 00:00:00';
-        $offset = 0;
-        $chunk  = 1000;
+        $chunk = 1000;
 
         do {
             $entries = $wpdb->get_results($wpdb->prepare(
@@ -717,8 +716,8 @@ class DB
                     SELECT 1 FROM {$wpdb->prefix}home_promo_status_log sl
                      WHERE sl.entry_id = fi.item_id
                 )
-              LIMIT %d OFFSET %d",
-                $pasif_field_id, $form_id, $chunk, $offset
+              LIMIT %d",
+                $pasif_field_id, $form_id, $chunk
             ), ARRAY_A);
 
             if (empty($entries)) break;
@@ -726,7 +725,7 @@ class DB
             $wpdb->query('START TRANSACTION');
             foreach ($entries as $row) {
                 $logged_at = (!empty($row['pasif_date_value']))
-                    ? date('Y-m-d H:i:s', strtotime($row['pasif_date_value']))
+                    ? gmdate('Y-m-d H:i:s', strtotime($row['pasif_date_value']))
                     : $sentinel_date;
                 $wpdb->query($wpdb->prepare(
                     "INSERT IGNORE INTO {$wpdb->prefix}home_promo_status_log
@@ -737,7 +736,6 @@ class DB
             }
             $wpdb->query('COMMIT');
 
-            $offset += $chunk;
         } while (count($entries) === $chunk);
 
         update_option('hpm_pasif_backfill_done', '1');
