@@ -1,0 +1,22 @@
+# Composer dependencies (install via `composer install`)
+vendor/
+
+# PHPUnit cache
+.phpunit.result.cache
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code / Superpowers session artifacts
+.superpowers/
+
+# Local environment
+.env
+*.local

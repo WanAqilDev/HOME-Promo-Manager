@@ -1,81 +1,68 @@
 # HOME Promo Manager
 
-A WordPress plugin to manage and track promotional slots for HOME campaigns, with real-time counters, admin controls, and Formidable Forms integration.
+A WordPress plugin that turns any promotional campaign into a configuration row.
+No code changes needed to run a new promo — just create a campaign in the admin UI.
+
+**Version:** 1.0.0  
+**Author:** Wan Aqil Hazim, QCXIS Sdn Bhd  
+**Requires PHP:** 7.4+  
+**Requires:** Formidable Forms Pro
 
 ## Features
 
-- **Promo Slot Management:**
-  - Tracks promo slot usage and limits (tiered codes, max slots).
-  - Assigns promo codes to form entries based on registration and status.
-  - Supports reactivation logic for returning users.
-
-- **Formidable Forms Integration:**
-  - Hooks into Formidable Forms to automate promo code assignment and slot counting.
-  - Uses entry meta fields for promo, status, and registration logic.
-
-- **Admin UI:**
-  - Settings page under WordPress Settings > HOME Promo Manager.
-  - Configure promo period, form IDs, field IDs, codes, and slot limits.
-  - Manual button to clear counted entries (for testing or reset).
-
-- **Shortcodes:**
-  - `[promo_countdown]`: Displays a static countdown and slot info.
-  - `[promo_realtime_counter]`: Displays a live widget with real-time slot/counter info via REST API.
-
-- **REST API:**
-  - Public endpoint `/wp-json/promo/v1/counter` returns current promo status, codes, slots, and countdown.
-
-- **Automatic Email Notifications:**
-  - Sends milestone emails to admin when slot thresholds are reached.
+- **Generic Campaign Engine** — create, activate, and manage multiple campaigns from the admin UI.
+- **Two campaign modes:**
+  - *Auto* — discount applied automatically; no code entry by staff.
+  - *Manual* — staff types a campaign code; per-code quotas enforced at submit.
+- **Eligibility engine** — three participant categories (new, diagnosed, reactivation) determined automatically from Formidable Forms entry data.
+- **Atomic slot counter** — race-safe quota enforcement via `INSERT IGNORE` + transaction guard.
+- **Real-time counter** — public REST endpoint serves live slot data to the promo page.
+- **Admin Campaigns tab** — full CRUD (create, edit, activate, pause, delete) under Settings > HOME Promo Manager.
+- **Shortcode** — `[hpm_counter]` displays the live remaining/total slot count.
+- **Status log** — plugin-owned Pasif transition log, retained for 2 years (top-3 events per entry kept forever).
 
 ## Installation
 
-1. Copy the plugin folder to your WordPress `wp-content/plugins` directory.
-2. Activate the plugin via the WordPress admin panel.
-3. Configure settings under Settings > HOME Promo Manager.
+1. Copy the plugin folder to `wp-content/plugins/`.
+2. Activate via the WordPress admin panel.
+3. Run `composer install` in the plugin directory to install test dependencies (development only).
+4. Configure field IDs under **Settings > HOME Promo Manager > Settings**.
 
-## Configuration
+## Creating a Campaign
 
-- **Promo Period:** Set start/end date/time (Asia/Kuala_Lumpur timezone).
-- **Form IDs & Field IDs:** Set the Formidable Form and field IDs for promo, registration, status, and reactivation logic.
-- **Codes & Limits:** Set tiered promo codes and slot limits.
-- **Admin Email:** Set the email for milestone notifications.
+1. Go to **Settings > HOME Promo Manager > Campaigns**.
+2. Click **Add Campaign**.
+3. Fill in: name, slug, mode (auto/manual), start/end date (MYT), quota, discount amount.
+   - *Auto mode:* enter the `campaign_code` value to be written to the promo field.
+   - *Manual mode:* enter `codes_config` JSON, e.g. `{"promo24": 240, "promo12": 240}`.
+4. Save as **Draft**, then **Activate** when the campaign goes live.
+5. Only one campaign can be active at a time — activating a second one is blocked until the first is ended or paused.
 
-## Usage
+## REST API
 
-- Add `[promo_countdown]` or `[promo_realtime_counter]` shortcodes to any post or page.
-- Use the admin page to monitor, configure, or reset promo slots.
+| Endpoint | Auth | Description |
+|---|---|---|
+| `GET /wp-json/promo/v1/counter` | Public | Returns `{used, max, remaining, active}` |
+| `GET /wp-json/promo/v1/campaigns` | Admin | List all campaigns |
+| `POST /wp-json/promo/v1/campaigns` | Admin | Create campaign |
+| `PUT /wp-json/promo/v1/campaigns/{id}` | Admin | Update campaign |
+| `DELETE /wp-json/promo/v1/campaigns/{id}` | Admin | Delete campaign (blocked if active) |
+
+## Shortcodes
+
+| Shortcode | Output |
+|---|---|
+| `[hpm_counter]` | Live `X / Y slot tersisa` counter via REST |
 
 ## Technical Notes
 
-- All core logic is modularized in `src/`.
-- Requires Formidable Forms Pro for entry meta integration.
-- Designed for extensibility and safe operation in WordPress environments.
+- All source files are in `src/`. Entry point is `home-promo-manager.php`.
+- DB tables: `wp_home_promo_campaigns`, `wp_home_promo_counted`, `wp_home_promo_active`, `wp_home_promo_status_log`.
+- Tables are created/migrated on plugin activation and on version bump.
+- Eligibility is evaluated on `frm_after_create_entry` and `frm_after_update_entry` for Form 13.
+- Field IDs are stored in `wp_options` (configurable), not hard-coded.
+- Test suite: PHPUnit 9 + Mockery. Run with `vendor/bin/phpunit`.
 
 ## Support
 
 For issues or feature requests, contact Wan Aqil Hazim, QCXIS Sdn Bhd.
-
-## Testing & Verification
-
-To verify the reactivation logic:
-
-1.  **Prerequisites**:
-    *   Ensure you have a user entry in Form 13 with status '2' (Pasif).
-    *   Ensure the 'Pasif Date' field for that entry is set to a date more than 90 days ago.
-
-2.  **Test Reactivation**:
-    *   Edit the entry in Form 13 (via admin or frontend).
-    *   Change the status from '2' (Pasif) to '1' (Aktif).
-    *   Save the entry.
-
-3.  **Verify Result**:
-    *   Check the entry meta: The 'Promo Code' field should now be populated with a new code.
-    *   Check the database: A new row should be added to the `home_promo_reactivations` table.
-    *   Check the counter: The total slot count should increment by 1.
-
----
-
-**Version:** 0.1.10
-**Author:** Wan Aqil Hazim, QCXIS Sdn Bhd
-**Requires PHP:** 7.4+
