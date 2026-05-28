@@ -560,7 +560,7 @@ class DB
     public static function column_exists(string $table, string $column): bool {
         global $wpdb;
         return ! empty($wpdb->get_var($wpdb->prepare(
-            "SHOW COLUMNS FROM {$table} LIKE %s", $column
+            "SHOW COLUMNS FROM `{$table}` LIKE %s", $column
         )));
     }
 }
