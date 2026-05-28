@@ -519,34 +519,48 @@ class DB
     {
         global $wpdb;
         $table = self::table_name();
-        
+
         // Check if column exists
         $column_exists = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
-             WHERE TABLE_SCHEMA = %s 
-             AND TABLE_NAME = %s 
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = %s
+             AND TABLE_NAME = %s
              AND COLUMN_NAME = 'is_legacy'",
             DB_NAME,
             $table
         ));
-        
+
         if ((int) $column_exists > 0) {
             return true; // Already exists
         }
-        
+
         // Add column
-        $sql = "ALTER TABLE {$table} 
+        $sql = "ALTER TABLE {$table}
                 ADD COLUMN is_legacy TINYINT(1) DEFAULT 0 AFTER eligibility_verified,
                 ADD INDEX idx_legacy (is_legacy)";
-        
+
         $result = $wpdb->query($sql);
-        
+
         if ($result === false) {
             error_log('[HPM] Failed to add is_legacy column: ' . $wpdb->last_error);
             return false;
         }
-        
+
         error_log('[HPM] Successfully added is_legacy column');
         return true;
+    }
+
+    /**
+     * Check if a column exists in a table
+     *
+     * @param string $table Table name
+     * @param string $column Column name
+     * @return bool True if column exists
+     */
+    public static function column_exists(string $table, string $column): bool {
+        global $wpdb;
+        return ! empty($wpdb->get_var($wpdb->prepare(
+            "SHOW COLUMNS FROM {$table} LIKE %s", $column
+        )));
     }
 }

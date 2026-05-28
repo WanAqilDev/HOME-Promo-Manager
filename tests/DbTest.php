@@ -43,6 +43,38 @@ class DBTest extends TestCase
         $this->assertEquals(5, DB::count_reactivations());
     }
 
+    public function testColumnExistsReturnsTrueWhenFound()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')
+            ->with(Mockery::pattern('/SHOW COLUMNS FROM/'), 'campaign_id')
+            ->once()
+            ->andReturn("SHOW COLUMNS FROM wp_home_promo_counted LIKE 'campaign_id'");
+        $mockWpdb->shouldReceive('get_var')
+            ->once()
+            ->andReturn('campaign_id');
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $this->assertTrue(DB::column_exists('wp_home_promo_counted', 'campaign_id'));
+    }
+
+    public function testColumnExistsReturnsFalseWhenMissing()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')
+            ->with(Mockery::pattern('/SHOW COLUMNS FROM/'), 'campaign_id')
+            ->once()
+            ->andReturn('sql');
+        $mockWpdb->shouldReceive('get_var')
+            ->once()
+            ->andReturn(null);
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $this->assertFalse(DB::column_exists('wp_home_promo_counted', 'campaign_id'));
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();
