@@ -14,7 +14,11 @@ class HookDispatcher
      */
     private static array $snapshot = [];
 
-    /** @var array<int,bool> reentrancy guard */
+    /**
+     * @var array<int,bool> reentrancy guard for field 3170 writes
+     * Populated in on_after_update_entry (Task 9) to prevent recursive hook
+     * re-entry when FrmEntryMeta::update_entry_meta() fires frm_after_update_entry again.
+     */
     private static array $writing_field = [];
 
     public static function init(): void
@@ -141,6 +145,11 @@ class HookDispatcher
     public static function get_snapshot_for_test(int $entry_id): array
     {
         return self::$snapshot[$entry_id] ?? [];
+    }
+
+    public static function build_ctx_for_test(string $event, int $entry_id, array $post_values): object
+    {
+        return self::build_ctx($event, $entry_id, $post_values);
     }
 
     // -----------------------------------------------------------------

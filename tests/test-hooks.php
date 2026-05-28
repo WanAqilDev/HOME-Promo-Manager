@@ -81,4 +81,71 @@ class HookDispatcherTest extends TestCase
         $value = HookDispatcher::get_field_snapshot_or_fallback(1, 1698);
         $this->assertNull($value);
     }
+
+    public function testBuildCtxSetsCorrectFieldsForCreatedEvent()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        // Sequence for 'created' event:
+        // 1. Log query for went_pasif_at → null (no log entry for new record)
+        // 2. Fallback SELECT for pasif_field → null (new entry has no previous value)
+        $mockWpdb->shouldReceive('get_var')
+            ->andReturnValues([null, null]);
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $ctx = HookDispatcher::build_ctx_for_test('created', 42, [
+            'form_id'   => 13,
+            'item_meta' => [
+                196  => 'Ya',
+                199  => '1',
+                1617 => 'Aktif',
+                3170 => null,
+            ],
+        ]);
+
+        $this->assertEquals('created', $ctx->event);
+        $this->assertEquals(42, $ctx->entry_id);
+        $this->assertEquals('Ya', $ctx->daftar);
+        $this->assertNull($ctx->prev_daftar);  // null for 'created' events
+        $this->assertEquals(1, $ctx->status);  // cast to int
+        $this->assertNull($ctx->prev_status);  // null for 'created' events
+        $this->assertNull($ctx->went_pasif_at);
+        $this->assertNull($ctx->pasif_days);
+    }
+
+    public function testBuildCtxComputesPasifDaysWhenLogEntryExists()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        // build_ctx will call get_var once for the log query to get went_pasif_at
+        // Since we return a date, it won't call the fallback for pasif_field
+        // Then it calls get_var for TIMESTAMPDIFF
+        // For 'updated' event, it also calls get_field_snapshot_or_fallback for prev_daftar, prev_status, prev_status_label
+        // Since snapshot is empty, that's 3 more get_var calls
+        // Total: log (returns date) → prev_daftar fallback (null) → prev_status fallback (null) → prev_status_label fallback (null) → TIMESTAMPDIFF (45)
+        // But actually, the prev_* calls happen before the log query. Let me check line order again.
+        // Lines 98-100 call get_field_snapshot_or_fallback first (3 calls)
+        // Line 103-107 is the log query (1 call)
+        // Line 109 checks if went_pasif_at is null and calls fallback if needed (0 calls in this case)
+        // Line 114-117 calls TIMESTAMPDIFF (1 call)
+        // So: prev_daftar, prev_status, prev_status_label, log, TIMESTAMPDIFF = 5 calls total
+        $mockWpdb->shouldReceive('get_var')
+            ->andReturnValues([null, null, null, '2026-03-01 00:00:00', 45]);
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $ctx = HookDispatcher::build_ctx_for_test('updated', 10, [
+            'form_id'   => 13,
+            'item_meta' => [
+                196  => 'Ya',
+                199  => '1',
+                1617 => 'Aktif',
+                3170 => null,
+            ],
+        ]);
+
+        $this->assertEquals('2026-03-01 00:00:00', $ctx->went_pasif_at);
+        $this->assertEquals(45, $ctx->pasif_days);
+    }
 }
