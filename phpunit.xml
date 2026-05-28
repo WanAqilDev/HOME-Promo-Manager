@@ -7,7 +7,10 @@
          stopOnFailure="false">
     <testsuites>
         <testsuite name="HOME Promo Manager Test Suite">
-            <directory>tests</directory>
+            <directory suffix="Test.php">tests</directory>
+            <directory suffix="-test.php">tests</directory>
+            <file>tests/test-manager.php</file>
+            <file>tests/test-campaign-engine.php</file>
         </testsuite>
     </testsuites>
 </phpunit>
