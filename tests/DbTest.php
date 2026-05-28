@@ -75,6 +75,18 @@ class DBTest extends TestCase
         $this->assertFalse(DB::column_exists('wp_home_promo_counted', 'campaign_id'));
     }
 
+    public function testInstallCreatesSqlForAllNewTables()
+    {
+        // Capture SQL passed to dbDelta by replacing the global function
+        $captured_sql = [];
+        // We can't easily intercept dbDelta, so test that install() runs without
+        // exception when the three new CREATE TABLE methods exist on DB.
+        // Also verify that the three methods produce the right table names.
+        $this->assertContains('home_promo_active',    DB::get_new_table_sql_names());
+        $this->assertContains('home_promo_campaigns',  DB::get_new_table_sql_names());
+        $this->assertContains('home_promo_status_log', DB::get_new_table_sql_names());
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();

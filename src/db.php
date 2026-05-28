@@ -70,9 +70,21 @@ class DB
             KEY idx_reactivated (reactivated_at)
         ) $charset;";
 
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        if (!function_exists('dbDelta') && defined('ABSPATH')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
         dbDelta($sql);
         dbDelta($sql2);
+
+        // New tables: active pointer, campaigns, status log
+        $charset_collate = $wpdb->get_charset_collate();
+        foreach (self::get_new_table_sqls($charset_collate) as $new_sql) {
+            dbDelta($new_sql);
+        }
+        // Seed the pointer row (idempotent)
+        $wpdb->query(
+            "INSERT IGNORE INTO {$wpdb->prefix}home_promo_active (singleton, campaign_id) VALUES (1, NULL)"
+        );
 
         // ensure default settings option exists
         if (get_option('home_promo_manager_settings') === false) {
@@ -131,7 +143,9 @@ class DB
                 KEY idx_reactivated (reactivated_at)
             ) $charset;";
 
-            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+            if (!function_exists('dbDelta') && defined('ABSPATH')) {
+                require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+            }
             dbDelta($sql);
 
             error_log('[HPM] Table creation attempted. Checking result...');
@@ -548,6 +562,65 @@ class DB
 
         error_log('[HPM] Successfully added is_legacy column');
         return true;
+    }
+
+    /**
+     * Return the base names (without prefix) of the three new tables added in this version.
+     *
+     * @return string[]
+     */
+    public static function get_new_table_sql_names(): array
+    {
+        return ['home_promo_active', 'home_promo_campaigns', 'home_promo_status_log'];
+    }
+
+    /**
+     * Return dbDelta-safe CREATE TABLE SQL strings for the three new tables.
+     *
+     * @param string $charset Result of $wpdb->get_charset_collate()
+     * @return string[]
+     */
+    private static function get_new_table_sqls(string $charset): array
+    {
+        global $wpdb;
+        return [
+            "CREATE TABLE {$wpdb->prefix}home_promo_active (
+  singleton TINYINT(1) NOT NULL DEFAULT 1,
+  campaign_id INT NULL,
+  activated_at DATETIME NULL,
+  activated_by BIGINT NULL,
+  PRIMARY KEY  (singleton),
+  UNIQUE KEY uq_active_campaign (campaign_id)
+) {$charset};",
+
+            "CREATE TABLE {$wpdb->prefix}home_promo_campaigns (
+  id INT AUTO_INCREMENT,
+  name VARCHAR(120) NOT NULL,
+  slug VARCHAR(80) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'draft',
+  mode VARCHAR(10) NOT NULL DEFAULT 'auto',
+  start_date DATETIME NOT NULL,
+  end_date DATETIME NOT NULL,
+  quota INT NOT NULL,
+  discount_amount DECIMAL(8,2) NOT NULL,
+  campaign_code VARCHAR(40) NULL,
+  codes_config LONGTEXT NULL,
+  created_at DATETIME NULL,
+  updated_at DATETIME NULL,
+  PRIMARY KEY  (id),
+  UNIQUE KEY uq_slug (slug)
+) {$charset};",
+
+            "CREATE TABLE {$wpdb->prefix}home_promo_status_log (
+  id INT AUTO_INCREMENT,
+  entry_id BIGINT NOT NULL,
+  from_status VARCHAR(20) NULL,
+  to_status VARCHAR(20) NOT NULL,
+  logged_at DATETIME NOT NULL,
+  PRIMARY KEY  (id),
+  KEY idx_entry_logged (entry_id, logged_at)
+) {$charset};",
+        ];
     }
 
     /**
