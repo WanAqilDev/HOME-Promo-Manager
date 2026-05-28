@@ -7,6 +7,8 @@ class HookDispatcherTest extends TestCase
     protected function tearDown(): void
     {
         HookDispatcher::reset_snapshot();
+        \HPM\CampaignEngine::flush();
+        $GLOBALS['wpdb'] = new MockWPDB();
         Mockery::close();
     }
 
@@ -187,5 +189,67 @@ class HookDispatcherTest extends TestCase
 
         $this->assertEquals('2026-03-01 00:00:00', $ctx->went_pasif_at);
         $this->assertEquals(45, $ctx->pasif_days);
+    }
+
+    public function testValidateEntrySkipsInAutoMode()
+    {
+        // No active campaign (MockWPDB get_row returns null) → no errors added
+        $errors = HookDispatcher::on_validate_entry([], [
+            'form_id'   => 13,
+            'id'        => 0,
+            'item_meta' => [],
+        ]);
+        $this->assertEmpty($errors);
+    }
+
+    public function testValidateEntryBlocksInvalidCodeInManualMode()
+    {
+        $row = (object)[
+            'id' => 1, 'name' => 'T', 'slug' => 't', 'status' => 'active',
+            'mode' => 'manual', 'start_date' => '2026-01-01 00:00:00',
+            'end_date' => '2030-01-01 00:00:00',
+            'quota' => 100, 'discount_amount' => '10.00',
+            'campaign_code' => null,
+            'codes_config'  => '{"promo24": 240}',
+        ];
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        $mockWpdb->shouldReceive('get_row')->once()->andReturn($row);
+        // already-counted check returns 0, then code-quota check is skipped (invalid code path)
+        $mockWpdb->shouldReceive('get_var')->andReturn('0');
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $errors = HookDispatcher::on_validate_entry([], [
+            'form_id'   => 13,
+            'id'        => 5,
+            'item_meta' => [3170 => 'BADCODE'],
+        ]);
+        $this->assertNotEmpty($errors);
+    }
+
+    public function testValidateEntrySkipsAlreadyCountedEntry()
+    {
+        $row = (object)[
+            'id' => 1, 'name' => 'T', 'slug' => 't', 'status' => 'active',
+            'mode' => 'manual', 'start_date' => '2026-01-01 00:00:00',
+            'end_date' => '2030-01-01 00:00:00',
+            'quota' => 100, 'discount_amount' => '10.00',
+            'campaign_code' => null,
+            'codes_config'  => '{"promo24": 240}',
+        ];
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        $mockWpdb->shouldReceive('get_row')->once()->andReturn($row);
+        $mockWpdb->shouldReceive('get_var')->once()->andReturn('1'); // already counted
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $errors = HookDispatcher::on_validate_entry([], [
+            'form_id'   => 13,
+            'id'        => 5,
+            'item_meta' => [3170 => ''],
+        ]);
+        $this->assertEmpty($errors); // already counted → pass through
     }
 }

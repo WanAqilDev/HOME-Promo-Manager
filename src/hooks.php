@@ -158,7 +158,44 @@ class HookDispatcher
 
     public static function on_validate_entry(array $errors, array $values): array
     {
-        return $errors; // Filled in Task 10
+        global $wpdb;
+        $mgr     = Manager::get_instance();
+        $form_id = (int) ($values['form_id'] ?? 0);
+        if ($form_id !== (int) $mgr->s('form_id')) return $errors;
+
+        $campaign = CampaignEngine::get_active();
+        if (!$campaign || $campaign->mode !== 'manual') return $errors;
+
+        $entry_id  = (int) ($values['id'] ?? 0);
+        $promo_fid = (int) $mgr->s('promo_field_id');
+        $code      = trim($values['item_meta'][$promo_fid] ?? '');
+
+        // Skip validation if already counted — unrelated field edits pass through freely
+        if ($entry_id > 0) {
+            $counted = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->prefix}home_promo_counted
+                  WHERE entry_id = %d AND campaign_id = %d",
+                $entry_id, $campaign->id
+            ));
+            if ($counted > 0) return $errors;
+        }
+
+        $codes_config = $campaign->get_codes_config();
+        if (!isset($codes_config[$code])) {
+            $errors['field_' . $promo_fid] = 'Kod promosi tidak sah.';
+            return $errors;
+        }
+
+        $used = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->prefix}home_promo_counted
+              WHERE campaign_id = %d AND promo_code = %s",
+            $campaign->id, $code
+        ));
+        if ($used >= $codes_config[$code]) {
+            $errors['field_' . $promo_fid] = 'Kuota kod promosi ini telah habis.';
+        }
+
+        return $errors;
     }
 
     public static function on_after_create_entry(int $entry_id, int $form_id): void
