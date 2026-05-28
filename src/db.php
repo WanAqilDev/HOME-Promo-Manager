@@ -110,7 +110,7 @@ class DB
                 'final_price' => 148.00,
                 'admin_email' => get_option('admin_email'),
                 'debug_mode' => false,
-            ]);
+            ], '', 'no');
         }
 
         self::run_column_migrations();
