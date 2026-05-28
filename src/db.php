@@ -767,4 +767,48 @@ class DB
             wp_cache_delete('alloptions', 'options');
         }
     }
+
+    public static function schedule_cleanup(): void
+    {
+        if (!wp_next_scheduled('hpm_status_log_cleanup')) {
+            wp_schedule_event(time(), 'daily', 'hpm_status_log_cleanup');
+        }
+        add_action('hpm_status_log_cleanup', [self::class, 'run_status_log_cleanup']);
+    }
+
+    public static function run_status_log_cleanup(): void
+    {
+        global $wpdb;
+        $two_years_ago = gmdate('Y-m-d H:i:s', strtotime('-2 years'));
+
+        $entry_ids = $wpdb->get_col(
+            "SELECT DISTINCT entry_id FROM {$wpdb->prefix}home_promo_status_log"
+        );
+        foreach ($entry_ids as $entry_id) {
+            $entry_id = (int) $entry_id;
+
+            $keep_ids = $wpdb->get_col($wpdb->prepare(
+                "SELECT id FROM {$wpdb->prefix}home_promo_status_log
+                  WHERE entry_id = %d
+                  ORDER BY logged_at DESC LIMIT 3",
+                $entry_id
+            ));
+
+            $recent_ids = $wpdb->get_col($wpdb->prepare(
+                "SELECT id FROM {$wpdb->prefix}home_promo_status_log
+                  WHERE entry_id = %d AND logged_at >= %s",
+                $entry_id, $two_years_ago
+            ));
+
+            $keep = array_unique(array_merge($keep_ids, $recent_ids));
+            if (empty($keep)) continue;
+
+            $placeholders = implode(',', array_fill(0, count($keep), '%d'));
+            $wpdb->query($wpdb->prepare(
+                "DELETE FROM {$wpdb->prefix}home_promo_status_log
+                  WHERE entry_id = %d AND id NOT IN ({$placeholders})",
+                array_merge([$entry_id], $keep)
+            ));
+        }
+    }
 }

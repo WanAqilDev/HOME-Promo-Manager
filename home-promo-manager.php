@@ -64,10 +64,17 @@ require_once __DIR__ . '/src/hooks.php';
 
 // Activation / uninstall
 register_activation_hook(__FILE__, ['\\HPM\\DB', 'install']);
+register_activation_hook(__FILE__, ['\\HPM\\DB', 'schedule_cleanup']);
+register_deactivation_hook(__FILE__, function () {
+    $timestamp = wp_next_scheduled('hpm_status_log_cleanup');
+    if ($timestamp) wp_unschedule_event($timestamp, 'hpm_status_log_cleanup');
+});
 register_uninstall_hook(__FILE__, ['\\HPM\\DB', 'uninstall']);
 
 // Ensure tables exist on every init (auto-creates if missing)
 add_action('init', ['\\HPM\\DB', 'maybe_create_tables']);
+// Register cron handler on every request so WP-Cron can fire it
+add_action('init', ['\\HPM\\DB', 'schedule_cleanup']);
 
 // GitHub Auto-Updater
 require_once HOME_PROMO_MANAGER_DIR . 'src/updater.php';
