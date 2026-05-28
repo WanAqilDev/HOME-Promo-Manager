@@ -1,157 +1,108 @@
 <?php
 namespace HPM;
 
-if (!defined('ABSPATH'))
-    exit;
+if (!defined('ABSPATH')) exit;
 
 add_action('rest_api_init', function () {
-    // Counter endpoint - Returns promo statistics
+    // Public counter endpoint
     register_rest_route('promo/v1', '/counter', [
-        'methods' => 'GET',
-        'callback' => function () {
-            // Ensure tables exist before querying
-            DB::maybe_create_tables();
-
-            $mgr = Manager::get_instance();
-            if (!$mgr->is_active()) {
-                return rest_ensure_response(['active' => false]);
-            }
-
-            // Get code assignment mode
-            $mode = $mgr->s('code_assignment_mode') ?: 'manual';
-
-            // Calculate end time
-            try {
-                $tz_string = $mgr->s('timezone') ?: 'Asia/Kuala_Lumpur';
-                try {
-                    $tz = new \DateTimeZone($tz_string);
-                } catch (\Exception $e) {
-                    $tz = new \DateTimeZone('Asia/Kuala_Lumpur');
-                }
-                $end_utc = (new \DateTimeImmutable($mgr->s('end'), $tz))
-                    ->setTimezone(new \DateTimeZone('UTC'))->getTimestamp();
-            } catch (\Exception $e) {
-                $end_utc = 0;
-            }
-
-            if ($mode === 'auto') {
-                // Legacy mode: tier-based response
-                $count = $mgr->get_count();
-                $max = (int) $mgr->s('max');
-                $tier1 = (int) $mgr->s('tier1_max');
-                $remaining_total = max(0, $max - $count);
-                $remaining_tier = ($count < $tier1) ? max(0, $tier1 - $count) : $remaining_total;
-
-                return rest_ensure_response([
-                    'active' => true,
-                    'mode' => 'auto',
-                    'current_code' => $mgr->get_current_code($count),
-                    'remaining_total' => intval($remaining_total),
-                    'remaining_tier' => intval($remaining_tier),
-                    'end_time' => intval($end_utc),
-                ]);
-            } else {
-                // SMART26 mode: per-code stats
-                $code_stats_array = DB::get_code_stats();
-                $category_stats = DB::get_category_stats();
-                $promo_codes = $mgr->s('promo_codes') ?: [];
-
-                // Convert to associative map for easier lookup
-                $code_usage_map = [];
-                foreach ($code_stats_array as $stat) {
-                    $code_usage_map[$stat['promo_code']] = (int) $stat['count'];
-                }
-
-                // Build per-code breakdown
-                $codes_data = [];
-                $total_used = 0;
-                $total_max = 0;
-                $current_code = null;
-                $current_remaining = 0;
-
-                foreach ($promo_codes as $code => $config) {
-                    if (!($config['active'] ?? true)) {
-                        continue; // Skip inactive codes
-                    }
-
-                    $used = $code_usage_map[$code] ?? 0;
-                    $max = (int) ($config['max'] ?? 0);
-                    $remaining = max(0, $max - $used);
-                    $total_used += $used;
-                    $total_max += $max;
-
-                    // Find first available code (for current_code backward compatibility)
-                    if ($remaining > 0 && $current_code === null) {
-                        $current_code = $code;
-                        $current_remaining = $remaining;
-                    }
-
-                    $codes_data[] = [
-                        'code' => $code,
-                        'description' => $config['description'] ?? '',
-                        'used' => $used,
-                        'max' => $max,
-                        'remaining' => $remaining,
-                        'percentage' => $max > 0 ? round(($used / $max) * 100, 1) : 0,
-                    ];
-                }
-
-                // Build category breakdown
-                $categories_data = [];
-                foreach ($category_stats as $cat => $count) {
-                    $categories_data[$cat] = (int) $count;
-                }
-
-                // Backward compatible response for promo page
-                return rest_ensure_response([
-                    'active' => true,
-                    'mode' => 'smart26',
-                    'current_code' => $current_code ?: '-', // First available code
-                    'remaining_tier' => $current_remaining, // Remaining for current code
-                    'remaining_total' => max(0, $total_max - $total_used), // Total remaining
-                    'total_used' => $total_used,
-                    'total_max' => $total_max,
-                    'codes' => $codes_data,
-                    'categories' => $categories_data,
-                    'end_time' => intval($end_utc),
-                ]);
-            }
-        },
+        'methods'             => 'GET',
+        'callback'            => 'HPM\rest_counter',
         'permission_callback' => '__return_true',
     ]);
 
-    // Validation endpoint - Validates promo code in real-time
-    register_rest_route('promo/v1', '/validate', [
-        'methods' => 'POST',
-        'callback' => function (\WP_REST_Request $request) {
-            $mgr = Manager::get_instance();
+    // Admin-only campaign CRUD
+    $admin_perm = fn() => current_user_can(CampaignEngine::CAP);
 
-            // Get code from request
-            $code = $request->get_param('code');
-            
-            if (empty($code)) {
-                return rest_ensure_response([
-                    'valid' => false,
-                    'message' => 'Please enter a promo code.',
-                    'remaining' => 0,
-                ]);
-            }
+    register_rest_route('promo/v1', '/campaigns', [
+        ['methods' => 'GET',  'callback' => 'HPM\rest_campaigns_list',   'permission_callback' => $admin_perm],
+        ['methods' => 'POST', 'callback' => 'HPM\rest_campaigns_create', 'permission_callback' => $admin_perm],
+    ]);
 
-            // Validate the code
-            $validation = $mgr->validate_code($code);
-
-            return rest_ensure_response($validation);
-        },
-        'permission_callback' => '__return_true',
-        'args' => [
-            'code' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Promo code to validate',
-                'sanitize_callback' => function($value) {
-                    return sanitize_text_field(trim($value));
-                },
-            ],
-        ],
+    register_rest_route('promo/v1', '/campaigns/(?P<id>\d+)', [
+        ['methods' => 'PUT',    'callback' => 'HPM\rest_campaigns_update', 'permission_callback' => $admin_perm],
+        ['methods' => 'DELETE', 'callback' => 'HPM\rest_campaigns_delete', 'permission_callback' => $admin_perm],
     ]);
 });
+
+function rest_counter(\WP_REST_Request $req): \WP_REST_Response {
+    global $wpdb;
+    $campaign = CampaignEngine::get_active();
+    if (!$campaign) {
+        return new \WP_REST_Response(['used' => 0, 'max' => 0, 'remaining' => 0, 'active' => false]);
+    }
+    $used = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM {$wpdb->prefix}home_promo_counted WHERE campaign_id = %d",
+        $campaign->id
+    ));
+    return new \WP_REST_Response([
+        'used'      => $used,
+        'max'       => $campaign->quota,
+        'remaining' => max(0, $campaign->quota - $used),
+        'active'    => true,
+    ]);
+}
+
+function rest_campaigns_list(\WP_REST_Request $req): \WP_REST_Response {
+    global $wpdb;
+    $rows = $wpdb->get_results(
+        "SELECT * FROM {$wpdb->prefix}home_promo_campaigns ORDER BY id DESC"
+    );
+    return new \WP_REST_Response($rows);
+}
+
+function rest_campaigns_create(\WP_REST_Request $req): \WP_REST_Response {
+    $data  = hpm_sanitise_campaign_fields($req->get_params());
+    $error = hpm_validate_campaign_fields($data, null);
+    if ($error) return new \WP_REST_Response(['error' => $error], 400);
+
+    global $wpdb;
+    $wpdb->query($wpdb->prepare(
+        "INSERT INTO {$wpdb->prefix}home_promo_campaigns
+           (name,slug,status,mode,start_date,end_date,quota,discount_amount,campaign_code,codes_config,created_at,updated_at)
+         VALUES (%s,%s,'draft',%s,%s,%s,%d,%f,%s,%s,UTC_TIMESTAMP(),UTC_TIMESTAMP())",
+        $data['name'], $data['slug'], $data['mode'],
+        $data['start_date'], $data['end_date'],
+        $data['quota'], $data['discount_amount'],
+        $data['campaign_code'], $data['codes_config']
+    ));
+    return new \WP_REST_Response(['id' => $wpdb->insert_id], 201);
+}
+
+function rest_campaigns_update(\WP_REST_Request $req): \WP_REST_Response {
+    $id    = (int) $req['id'];
+    $data  = hpm_sanitise_campaign_fields($req->get_params());
+    $error = hpm_validate_campaign_fields($data, $id);
+    if ($error) return new \WP_REST_Response(['error' => $error], 400);
+
+    global $wpdb;
+    $wpdb->query($wpdb->prepare(
+        "UPDATE {$wpdb->prefix}home_promo_campaigns
+            SET name=%s,slug=%s,mode=%s,start_date=%s,end_date=%s,
+                quota=%d,discount_amount=%f,campaign_code=%s,codes_config=%s,
+                updated_at=UTC_TIMESTAMP()
+          WHERE id=%d",
+        $data['name'], $data['slug'], $data['mode'],
+        $data['start_date'], $data['end_date'],
+        $data['quota'], $data['discount_amount'],
+        $data['campaign_code'], $data['codes_config'], $id
+    ));
+    CampaignEngine::flush();
+    return new \WP_REST_Response(['updated' => true]);
+}
+
+function rest_campaigns_delete(\WP_REST_Request $req): \WP_REST_Response {
+    global $wpdb;
+    $id      = (int) $req['id'];
+    $pointed = (int) $wpdb->get_var(
+        "SELECT campaign_id FROM {$wpdb->prefix}home_promo_active WHERE singleton=1"
+    );
+    if ($pointed === $id) {
+        return new \WP_REST_Response(['error' => 'Cannot delete active campaign.'], 409);
+    }
+    $wpdb->query($wpdb->prepare(
+        "DELETE FROM {$wpdb->prefix}home_promo_campaigns WHERE id=%d", $id
+    ));
+    CampaignEngine::flush();
+    return new \WP_REST_Response(['deleted' => true]);
+}
