@@ -1,21 +1,26 @@
 <?php
-// Bootstrap for HOME Promo Manager
+namespace HPM;
 
-// load core pieces
-require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/Manager.php';
-require_once __DIR__ . '/hooks.php';
-require_once __DIR__ . '/rest.php';
-// load admin UI (settings page)
-require_once __DIR__ . '/admin.php';
+if (!defined('ABSPATH')) exit;
 
-// Activation / uninstall
-register_activation_hook(HOME_PROMO_MANAGER_FILE, ['\\HPM\\DB', 'install']);
-register_uninstall_hook(HOME_PROMO_MANAGER_FILE, ['\\HPM\\DB', 'uninstall']);
+$plugin_dir = plugin_dir_path(__FILE__ . '/../');
 
-// Ensure tables exist on every init (auto-creates if missing)
-add_action('init', ['\\HPM\\DB', 'maybe_create_tables']);
+require_once $plugin_dir . 'src/db.php';
+require_once $plugin_dir . 'src/Manager.php';
+require_once $plugin_dir . 'src/CampaignEngine.php';
+require_once $plugin_dir . 'src/Eligibility.php';
+require_once $plugin_dir . 'src/hooks.php';
+require_once $plugin_dir . 'src/admin.php';
+require_once $plugin_dir . 'src/rest.php';
+require_once $plugin_dir . 'src/shortcodes.php';
+require_once $plugin_dir . 'src/templates.php';
+require_once $plugin_dir . 'src/updater.php';
 
-// Instantiate manager (singleton)
-$hpm_manager = \HPM\Manager::get_instance();
-$GLOBALS['home_promo_manager'] = $hpm_manager;
+// Version bump detection → run install migrations
+$stored_version = get_option('home_promo_manager_version', '0.0.0');
+if (version_compare($stored_version, HOME_PROMO_MANAGER_VERSION, '<')) {
+    DB::install($stored_version, HOME_PROMO_MANAGER_VERSION);
+    update_option('home_promo_manager_version', HOME_PROMO_MANAGER_VERSION);
+}
+
+DB::schedule_cleanup();
