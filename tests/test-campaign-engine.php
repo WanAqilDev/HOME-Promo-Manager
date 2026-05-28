@@ -244,4 +244,89 @@ class CampaignEngineTest extends TestCase
         $result = CampaignEngine::deactivate(1, 99);
         $this->assertEquals('ok', $result['status']);
     }
+
+    public function testClaimSlotReturnsNoActiveCampaignWhenNone()
+    {
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        $mockWpdb->shouldReceive('get_row')->andReturn(null); // no active campaign
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $ctx = (object)['entry_id' => 1, 'daftar' => 'Ya', 'went_pasif_at' => null,
+                        'pasif_days' => null, 'event' => 'created', 'prev_daftar' => null,
+                        'status' => 1, 'status_label' => 'Aktif', 'submitted_code' => null];
+        $result = CampaignEngine::claim_slot($ctx);
+        $this->assertEquals('no_active_campaign', $result['status']);
+    }
+
+    public function testClaimSlotReturnsAlreadyCounted()
+    {
+        $row = (object)[
+            'id' => 1, 'name' => 'T', 'slug' => 't', 'status' => 'active',
+            'mode' => 'auto', 'start_date' => '2026-01-01 00:00:00',
+            'end_date' => '2030-01-01 00:00:00',
+            'quota' => 100, 'discount_amount' => '10.00',
+            'campaign_code' => 'TEST', 'codes_config' => null,
+        ];
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        $mockWpdb->shouldReceive('get_row')->once()->andReturn($row);
+        $mockWpdb->shouldReceive('get_var')->once()->andReturn('1'); // already counted
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $ctx = (object)['entry_id' => 5, 'daftar' => 'Ya', 'went_pasif_at' => null,
+                        'pasif_days' => null, 'event' => 'created', 'prev_daftar' => null,
+                        'status' => 1, 'status_label' => 'Aktif', 'submitted_code' => null];
+        $result = CampaignEngine::claim_slot($ctx);
+        $this->assertEquals('already_counted', $result['status']);
+    }
+
+    public function testClaimSlotIneligibleWhenDaftarNotYa()
+    {
+        $row = (object)[
+            'id' => 1, 'name' => 'T', 'slug' => 't', 'status' => 'active',
+            'mode' => 'auto', 'start_date' => '2026-01-01 00:00:00',
+            'end_date' => '2030-01-01 00:00:00',
+            'quota' => 100, 'discount_amount' => '10.00',
+            'campaign_code' => 'TEST', 'codes_config' => null,
+        ];
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        $mockWpdb->shouldReceive('get_row')->once()->andReturn($row);
+        $mockWpdb->shouldReceive('get_var')->once()->andReturn('0'); // not counted
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        $ctx = (object)['entry_id' => 5, 'daftar' => 'Tidak', 'went_pasif_at' => null,
+                        'pasif_days' => null, 'event' => 'created', 'prev_daftar' => null,
+                        'status' => 1, 'status_label' => 'Aktif', 'submitted_code' => null];
+        $result = CampaignEngine::claim_slot($ctx);
+        $this->assertEquals('ineligible', $result['status']);
+    }
+
+    public function testClaimSlotDeniesOnStatusDivergence()
+    {
+        $row = (object)[
+            'id' => 1, 'name' => 'T', 'slug' => 't', 'status' => 'active',
+            'mode' => 'auto', 'start_date' => '2026-01-01 00:00:00',
+            'end_date' => '2030-01-01 00:00:00',
+            'quota' => 100, 'discount_amount' => '10.00',
+            'campaign_code' => 'TEST', 'codes_config' => null,
+        ];
+        $mockWpdb = Mockery::mock('MockWPDB');
+        $mockWpdb->prefix = 'wp_';
+        $mockWpdb->shouldReceive('prepare')->andReturn('sql');
+        $mockWpdb->shouldReceive('get_row')->once()->andReturn($row);
+        $mockWpdb->shouldReceive('get_var')->once()->andReturn('0'); // not counted
+        $GLOBALS['wpdb'] = $mockWpdb;
+
+        // status_label='Aktif' but status=0 (divergence)
+        $ctx = (object)['entry_id' => 5, 'daftar' => 'Ya', 'went_pasif_at' => null,
+                        'pasif_days' => null, 'event' => 'created', 'prev_daftar' => null,
+                        'status' => 0, 'status_label' => 'Aktif', 'submitted_code' => null];
+        $result = CampaignEngine::claim_slot($ctx);
+        $this->assertEquals('status_divergence', $result['status']);
+    }
 }

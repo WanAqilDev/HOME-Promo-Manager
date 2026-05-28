@@ -177,5 +177,109 @@ class CampaignEngine
         }
     }
 
-    // claim_slot() implemented in Task 8
+    public static function claim_slot(object $ctx): array
+    {
+        global $wpdb;
+
+        $campaign = self::get_active();
+        if (!$campaign) return ['status' => 'no_active_campaign'];
+
+        // Early bail — already counted
+        $already = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->prefix}home_promo_counted
+              WHERE entry_id = %d AND campaign_id = %d",
+            $ctx->entry_id, $campaign->id
+        ));
+        if ($already > 0) return ['status' => 'already_counted'];
+
+        // Status check — fail-closed
+        $status_ok_label = ((string) $ctx->status_label === 'Aktif');
+        $status_ok_199   = ($ctx->status === 1);
+        if ($status_ok_label !== $status_ok_199) {
+            error_log(sprintf(
+                '[HPM] Status divergence entry_id=%d field_1617="%s" field_199=%d — slot denied',
+                $ctx->entry_id, $ctx->status_label, $ctx->status
+            ));
+            return ['status' => 'status_divergence'];
+        }
+
+        // Eligibility
+        $spec   = new OrSpecification(new NewSpec(), new DiagnosedSpec(), new ReactivationSpec());
+        $result = $spec->isSatisfied($ctx);
+        if ($result === false) return ['status' => 'ineligible'];
+
+        $category = $result;
+        $source   = ($ctx->went_pasif_at === null) ? 'legacy_default' : 'live';
+
+        // Code resolution
+        if ($campaign->mode === 'auto') {
+            $code_to_write = $campaign->campaign_code;
+        } else {
+            $code_to_write = $ctx->submitted_code ?? '';
+            if (empty($code_to_write)) return ['status' => 'no_code'];
+        }
+
+        // Reentrancy guard
+        if (!empty(self::$writing_field[$ctx->entry_id])) {
+            return ['status' => 'reentrant'];
+        }
+
+        $wpdb->query('START TRANSACTION');
+        try {
+            // Manual mode Layer 2 — serialise quota check with FOR UPDATE
+            if ($campaign->mode === 'manual') {
+                $codes_config = $campaign->get_codes_config();
+                $quota_code   = $codes_config[$code_to_write] ?? 0;
+                $used = (int) $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$wpdb->prefix}home_promo_counted
+                      WHERE campaign_id = %d AND promo_code = %s FOR UPDATE",
+                    $campaign->id, $code_to_write
+                ));
+                if ($used >= $quota_code) {
+                    $wpdb->query('ROLLBACK');
+                    return ['status' => 'code_quota_exhausted', 'code' => $code_to_write];
+                }
+            }
+
+            $inserted = $wpdb->query($wpdb->prepare(
+                "INSERT IGNORE INTO {$wpdb->prefix}home_promo_counted
+                   (entry_id, campaign_id, promo_code, category, source, counted_at)
+                 VALUES (%d, %d, %s, %s, %s, UTC_TIMESTAMP())",
+                $ctx->entry_id, $campaign->id, $code_to_write, $category, $source
+            ));
+
+            if ((int) $inserted !== 1) {
+                $wpdb->query('ROLLBACK');
+                return ['status' => 'duplicate'];
+            }
+
+            self::$writing_field[$ctx->entry_id] = true;
+            $field_ok = false;
+            try {
+                $field_ok = \FrmEntryMeta::update_entry_meta(
+                    $ctx->entry_id,
+                    Manager::get_instance()->s('promo_field_id'),
+                    null,
+                    $code_to_write
+                );
+            } finally {
+                unset(self::$writing_field[$ctx->entry_id]);
+            }
+
+            if (!$field_ok) {
+                $wpdb->query('ROLLBACK');
+                error_log("HPM: field 3170 write failed for entry {$ctx->entry_id}, rolled back slot");
+                return ['status' => 'field_write_failed'];
+            }
+
+            $wpdb->query('COMMIT');
+            return ['status' => 'claimed', 'category' => $category, 'source' => $source];
+
+        } catch (\Throwable $e) {
+            $wpdb->query('ROLLBACK');
+            unset(self::$writing_field[$ctx->entry_id]);
+            error_log("HPM: exception during claim_slot, rolled back: " . $e->getMessage());
+            return ['status' => 'error'];
+        }
+    }
 }
