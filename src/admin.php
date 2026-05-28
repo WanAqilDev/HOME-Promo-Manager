@@ -437,6 +437,7 @@ function hpm_render_settings_tab(): void
                 </div>
             </div>
         </div>
+        <?php endif; // end mode toggle legacy section ?>
 
         <!-- Dynamic Code Management (legacy — removed in v1.0 — campaigns managed via Campaigns tab) -->
         <?php if (false): ?>
