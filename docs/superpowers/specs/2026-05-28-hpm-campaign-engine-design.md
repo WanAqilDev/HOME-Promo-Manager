@@ -40,7 +40,7 @@ wp_home_promo_counted  +  wp_home_promo_status_log
 
 | File | Role |
 |---|---|
-| `src/CampaignEngine.php` | New. Loads active campaign once per request into a static cache. Exposes `claim_slot($ctx)` and `public static function flush(): void` to clear the cache. |
+| `src/CampaignEngine.php` | New. Loads active campaign once per request into a static cache. Exposes `get_active()`, `claim_slot($ctx)`, and `public static function flush(): void` to clear the cache. |
 | `src/Eligibility.php` | New. `OrSpecification` wrapping `NewSpec`, `DiagnosedSpec`, `ReactivationSpec` |
 | `src/hooks.php` | Refactored. Pre-hook snapshot + `$ctx` normalisation. Removes all SMART26 logic. |
 | `src/Manager.php` | Simplified. Removes tier/code logic, delegates to `CampaignEngine` |
@@ -53,13 +53,13 @@ wp_home_promo_counted  +  wp_home_promo_status_log
 
 ### CampaignEngine cache lifecycle
 
-`CampaignEngine::active()` memoises the active campaign in a private static property for the duration of one HTTP request:
+`CampaignEngine::get_active()` memoises the active campaign in a private static property for the duration of one HTTP request:
 
 ```php
 private static ?Campaign $active_campaign = null;
 private static bool      $loaded          = false;
 
-public static function active(): ?Campaign {
+public static function get_active(): ?Campaign {
     if ( ! self::$loaded ) {
         self::$active_campaign = self::query_active_campaign();
         self::$loaded          = true;
@@ -155,10 +155,11 @@ UPDATE wp_home_promo_active
        activated_at = UTC_TIMESTAMP(),
        activated_by = :user_id
  WHERE singleton = 1
-   AND (campaign_id IS NULL OR campaign_id <> :new_id);
+   AND campaign_id IS NULL;
 
--- affected_rows = 0 means pointer already points to :new_id (idempotent)
--- or a concurrent activator won the race — re-SELECT to disambiguate.
+-- affected_rows = 0 means EITHER the pointer already points to :new_id (idempotent
+-- success) OR another campaign is currently active. Re-SELECT the pointer row to
+-- disambiguate before committing or rejecting.
 
 UPDATE wp_home_promo_campaigns SET status = 'active' WHERE id = :new_id;
 UPDATE wp_home_promo_campaigns SET status = 'paused'
@@ -167,17 +168,28 @@ UPDATE wp_home_promo_campaigns SET status = 'paused'
 COMMIT;
 ```
 
-If `affected_rows = 0` and pointer's `campaign_id` is some other id `X != :new_id`, the admin save is rejected with: *"Campaign #X is already active. Deactivate it first."*
+If `affected_rows = 0`, re-SELECT `campaign_id` from `wp_home_promo_active WHERE singleton = 1`:
+- If `campaign_id = :new_id` → treat as idempotent success (no error, commit any status-column updates).
+- If `campaign_id = X` where `X != :new_id` (including any non-NULL other id) → reject the admin save with: *"Campaign #X is already active. Deactivate it first."* The activation transaction is rolled back; the operator must explicitly deactivate the current campaign first.
 
 ### Deactivation flow
 
 ```sql
+START TRANSACTION;
+
 UPDATE wp_home_promo_active
    SET campaign_id = NULL, activated_at = UTC_TIMESTAMP(), activated_by = :user_id
  WHERE singleton = 1 AND campaign_id = :old_id;
+
+UPDATE wp_home_promo_campaigns
+   SET status = 'paused'
+ WHERE id = :old_id
+   AND status = 'active';
+
+COMMIT;
 ```
 
-`affected_rows = 0` = already deactivated — treat as success (idempotent).
+`affected_rows = 0` on the pointer UPDATE = already deactivated — treat as success (idempotent). The status-column UPDATE is also idempotent: if the row is already non-`'active'`, it is a no-op.
 
 ### Engine read path
 
@@ -263,23 +275,24 @@ Field 1698 (pasif date) is conditionally hidden in Formidable when field 1617 �
 **Solution — A + B combined:**
 
 **A — Pre-hook snapshot with DB fallback:**
-`frm_pre_update_entry` reads field 1698 from `frm_item_metas` *before* Formidable processes the submit and stashes the value in `static $snapshot[$entry_id]`. `self::SENTINEL_UNSET` (e.g. `"\0HPM_UNSET"`) distinguishes "hook never ran" from "hook ran and read null" — plain `isset()` cannot distinguish these.
+`frm_pre_update_entry` reads each tracked field (1617, 199, 196, 1698) from `frm_item_metas` *before* Formidable processes the submit and stashes the values in `static $snapshot[$entry_id][$field_id]` — keyed first by entry id, then by field id. `self::SENTINEL_UNSET` (e.g. `"\0HPM_UNSET"`) distinguishes "hook never ran for this (entry, field)" from "hook ran and read null" — plain `isset()` cannot distinguish these.
 
-`frm_pre_update_entry` is **not guaranteed to fire** on all update paths (Formidable REST API, `FrmEntry::update()` calls, WP-CLI). Fallback inside `frm_after_update_entry`:
+`frm_pre_update_entry` is **not guaranteed to fire** on all update paths (Formidable REST API, `FrmEntry::update()` calls, WP-CLI). Fallback inside `frm_after_update_entry`, per field:
 
 ```php
-if (!isset(self::$snapshot[$entry_id])
-    || self::$snapshot[$entry_id] === self::SENTINEL_UNSET) {
+$field_id = Manager::get_field_id('pasif_date');
+if (!isset(self::$snapshot[$entry_id][$field_id])
+    || self::$snapshot[$entry_id][$field_id] === self::SENTINEL_UNSET) {
     $value = $wpdb->get_var($wpdb->prepare(
         "SELECT meta_value FROM {$wpdb->prefix}frm_item_metas
           WHERE item_id = %d AND field_id = %d LIMIT 1",
-        $entry_id, Manager::get_field_id('pasif_date')
+        $entry_id, $field_id
     ));
-    self::$snapshot[$entry_id] = $value;
+    self::$snapshot[$entry_id][$field_id] = $value;
 }
 ```
 
-One extra SELECT only on the fallback path.
+One extra SELECT per missing field only on the fallback path.
 
 **B — Plugin-owned status log:**
 When `frm_after_update_entry` detects field 1617 transitioning TO `"Pasif"`, the plugin writes:
@@ -316,7 +329,7 @@ $ctx->pasif_days        // computed: TIMESTAMPDIFF(DAY, went_pasif_at, UTC_TIMES
 
 ### Source-of-truth constraint for `prev_*` values
 
-All `prev_*` fields MUST be sourced from a direct `$wpdb` SELECT against `frm_item_metas` performed inside `frm_pre_update_entry` **before** Formidable applies submitted values. Stored in `self::$snapshot[$entry_id]` keyed by field id.
+All `prev_*` fields MUST be sourced from a direct `$wpdb` SELECT against `frm_item_metas` performed inside `frm_pre_update_entry` **before** Formidable applies submitted values. Stored in `self::$snapshot[$entry_id][$field_id]` — a two-level array keyed first by entry id, then by field id.
 
 `prev_*` fields MUST NOT be sourced from:
 - `$_POST` or `$_REQUEST` (contain new submitted values)
@@ -424,8 +437,16 @@ A campaign is in exactly one mode, fixed at creation. The engine branches off `$
 *Layer 2 — inside `claim_slot()` transaction (authoritative):*
 `SELECT COUNT(*) ... FOR UPDATE` before INSERT forces serialisation via InnoDB row/gap locks. First transaction sees `used = quota-1`, inserts, commits. Second blocks, re-reads `used = quota`, rolls back with `code_quota_exhausted`.
 
-**Field 3170 integrity re-write (Manual mode only):**
-If `(entry_id, campaign_id)` is already in `wp_home_promo_counted`, `frm_after_update_entry` reads the original code from the counted row and re-writes it to field 3170 via `FrmEntryMeta::update_entry_meta()` whenever the submitted value differs (including blank). Silent — no validation error, no admin notice. Protects against accidental clearing.
+**Field 3170 integrity re-write (both modes):**
+If `(entry_id, campaign_id)` is already in `wp_home_promo_counted`, `frm_after_update_entry` reads the original code from the counted row and re-writes it to field 3170 via `FrmEntryMeta::update_entry_meta()` whenever the submitted value differs (including blank). Silent — no validation error, no admin notice. Protects against accidental clearing. This applies regardless of mode: in Auto mode the original code is the campaign's `campaign_code`; in Manual mode it is whichever code the operator originally entered for that entry.
+
+**Reentrancy guard (mandatory):**
+Writing field 3170 from inside `frm_after_update_entry` can itself re-trigger `frm_after_update_entry` depending on which Formidable API is used. The spec mandates:
+
+1. **API choice.** The field 3170 write MUST use `FrmEntryMeta::update_entry_meta()` directly. `FrmEntry::update()` MUST NOT be used for this write — it re-fires the full entry-update hook chain and would cause infinite recursion.
+2. **Static reentrancy flag.** Before any field 3170 write (whether the initial claim write or the integrity re-write), the hook handler MUST set `self::$writing_field[$entry_id] = true`. At the top of `frm_after_update_entry`, the handler MUST check this flag and `return` immediately if already set for the current `$entry_id`. The flag MUST be cleared (via `unset(self::$writing_field[$entry_id])`) in a `finally` block after the write completes, regardless of success or failure.
+
+These two safeguards are belt-and-braces: (1) avoids the documented re-fire path, (2) protects against any future Formidable change or third-party plugin that re-issues `frm_after_update_entry` during meta writes.
 
 **Mode-exclusive columns:**
 
@@ -434,7 +455,7 @@ If `(entry_id, campaign_id)` is already in `wp_home_promo_counted`, `frm_after_u
 | `'auto'` | Required, non-empty (e.g. `"6CURE"`) | MUST be NULL |
 | `'manual'` | MUST be NULL | Required, non-empty JSON object |
 
-`CampaignEngine::load_active()` asserts this constraint and throws `\RuntimeException` on violation.
+`CampaignEngine::get_active()` asserts this constraint and throws `\RuntimeException` on violation.
 
 **Eligibility specs are still required** — the code check is an additional gate on top of `OrSpecification`, not a bypass.
 
@@ -446,7 +467,7 @@ If `(entry_id, campaign_id)` is already in `wp_home_promo_counted`, `frm_after_u
 |---|---|
 | Campaign `end_date` passes during mid-flight submit | Honour the claim — `is_active()` is evaluated once at request start |
 | Client status reverts to Pasif after promo issued | No revocation — promo stands. Finance report reflects issued state. |
-| Unrelated field edit on form 13 (auto mode) | Safe — `prev_daftar === daftar`, no spec fires |
+| Unrelated field edit on form 13 (auto mode) | Safe — `prev_daftar === daftar`, no spec fires; if entry is already counted, field 3170 is re-asserted from the counted row if blanked |
 | Unrelated field edit on form 13 (manual mode) | Safe — early bail if `(entry_id, campaign_id)` already counted; field 3170 re-asserted if blanked |
 | Pre-deploy entries: no log, no field 1698 value | Default to "new" with `source='legacy_default'`. Finance filters and displays these separately as "provisional new" entries. |
 | Slot claimed via null-pasif-days fallback | `source='legacy_default'` written to counted row. Finance report must surface this. |
@@ -523,8 +544,9 @@ source      VARCHAR(20) NULL DEFAULT 'live'   -- 'live' | 'legacy_default' | NUL
 -- Add unique key:
 UNIQUE KEY uq_entry_campaign (entry_id, campaign_id)
 
--- Add index:
+-- Add indexes:
 INDEX idx_campaign (campaign_id)              -- supports per-campaign quota count query
+INDEX idx_campaign_code (campaign_id, promo_code)  -- supports Manual mode Layer 2 `WHERE campaign_id=? AND promo_code=? FOR UPDATE`; without it the FOR UPDATE degrades to a wider range/gap lock
 ```
 
 `source` column semantics:
@@ -578,7 +600,8 @@ if (!self::column_exists($wpdb->prefix . 'home_promo_counted', 'campaign_id')) {
         ADD COLUMN campaign_id INT NULL,
         ADD COLUMN source VARCHAR(20) NULL DEFAULT 'live',
         ADD UNIQUE KEY uq_entry_campaign (entry_id, campaign_id),
-        ADD INDEX idx_campaign (campaign_id)");
+        ADD INDEX idx_campaign (campaign_id),
+        ADD INDEX idx_campaign_code (campaign_id, promo_code)");
 }
 
 if (!self::column_exists($wpdb->prefix . 'home_promo_reactivations', 'went_pasif_at')) {
@@ -588,7 +611,7 @@ if (!self::column_exists($wpdb->prefix . 'home_promo_reactivations', 'went_pasif
 }
 ```
 
-3. **One-time Pasif backfill** (runs once per site, gated by `home_promo_manager_db_version` option): populates `wp_home_promo_status_log` for all form 13 entries currently in "Pasif" status that have no log row. Uses field 1698 value as `logged_at`; falls back to sentinel `1970-01-01 00:00:00` when field 1698 is empty (forces `pasif_days >= 90` → "reactivation" — the safer default). Chunked at 1000 entries per batch. Wrapped in a single transaction.
+3. **One-time Pasif backfill** (runs once per site, gated by `home_promo_manager_db_version` option): populates `wp_home_promo_status_log` for all form 13 entries currently in "Pasif" status that have no log row. Uses field 1698 value as `logged_at`; falls back to sentinel `1970-01-01 00:00:00` when field 1698 is empty (forces `pasif_days >= 90` → "reactivation" — the safer default). Chunked at 1000 entries per batch; **each 1000-entry chunk is wrapped in its own transaction** (not a single transaction spanning all chunks). This keeps InnoDB log/undo buffers bounded on large sites and lets the migration resume cleanly if interrupted between chunks.
 
 4. All new columns are NULL-able. No downgrade path — `DB::install()` only adds, never drops or renames.
 
@@ -661,6 +684,17 @@ Reads via `get_option()` only inside: the plugin settings admin page render hand
 16. Programmatic `FrmEntry::update()` (no pre-hook) → fallback SELECT populates snapshot, eligibility resolves correctly
 17. Pre-deploy entry with field 1617 = "Pasif" → after install, `wp_home_promo_status_log` has backfill row. Re-running `DB::install()` does not duplicate it
 18. MySQL `time_zone = '+08:00'`: entry with `went_pasif_at` UTC 90 days ago → classified as `"reactivation"` regardless of session timezone
-19. `CampaignEngine::flush()` called → next `active()` call reflects new DB state, not pre-flush cache
+19. `CampaignEngine::flush()` called → next `get_active()` call reflects new DB state, not pre-flush cache
 20. `hpm_status_log_cleanup` cron fires → rows older than 2 years deleted except where doing so drops below 3 retained rows per entry
 21. Null pasif history fallback → slot claimed with `source='legacy_default'`; Finance report flags it separately
+22. Unauthenticated POST to `/promo/v1/campaigns` returns HTTP 401/403; admin GET with valid nonce succeeds.
+23. Admin form submitted without nonce (or with invalid nonce) → `check_admin_referer()` kills request, no DB write.
+24. Campaign name with only non-Latin characters → slug is rejected with operator-facing error, form state preserved.
+25. Slug < 3 characters or > 80 characters → rejected with operator-facing error.
+26. Duplicate slug on create or edit → rejected with operator-facing error.
+27. Create `mode='auto'` campaign with `codes_config` populated → rejected. Create `mode='manual'` with `campaign_code` → rejected.
+28. `discount_amount` submitted as `0`, negative, or `> 999999.99` → rejected with admin error.
+29. After plugin activation on a fresh install, `SELECT autoload FROM wp_options WHERE option_name='home_promo_manager_settings'` returns `'no'`.
+30. After upgrading from a legacy install (autoload was 'yes'), defensive flip sets autoload to 'no' and cache is cleared.
+31. Deactivate an already-deactivated campaign → treated as success (idempotent, no error).
+32. Session timezone test (Issue 8) covers both < 90 day branch (diagnosed) and ≥ 90 day branch (reactivation).
