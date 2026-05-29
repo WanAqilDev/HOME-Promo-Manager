@@ -25,7 +25,7 @@ class HookDispatcher
     {
         add_filter('frm_validate_entry',     [self::class, 'on_validate_entry'],     10, 2);
         add_action('frm_after_create_entry', [self::class, 'on_after_create_entry'], 10, 2);
-        add_action('frm_pre_update_entry',   [self::class, 'on_pre_update_entry'],   10, 2);
+        add_filter('frm_pre_update_entry',   [self::class, 'on_pre_update_entry'],   10, 2);
         add_action('frm_after_update_entry', [self::class, 'on_after_update_entry'], 10, 2);
     }
 
@@ -33,8 +33,9 @@ class HookDispatcher
     // Pre-hook snapshot
     // -----------------------------------------------------------------
 
-    public static function on_pre_update_entry(int $entry_id, array $values): void
+    public static function on_pre_update_entry(array $values, $entry_id): array
     {
+        $entry_id = (int) $entry_id;
         global $wpdb;
         $mgr = Manager::get_instance();
 
@@ -53,6 +54,8 @@ class HookDispatcher
             ));
             self::$snapshot[$entry_id][$field_id] = $value; // null is legitimate
         }
+
+        return $values; // frm_pre_update_entry is a filter — pass through unchanged
     }
 
     public static function get_field_snapshot_or_fallback(int $entry_id, int $field_id): ?string
