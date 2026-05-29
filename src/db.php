@@ -673,6 +673,22 @@ class DB
             );
         }
 
+        // Drop the legacy single-column uq_entry once uq_entry_campaign is in place.
+        // Without this, an entry counted in Campaign A can never be counted in Campaign B.
+        if (self::column_exists("{$wpdb->prefix}home_promo_counted", 'campaign_id')) {
+            $key_exists = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+                  WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME   = %s
+                    AND CONSTRAINT_NAME = 'uq_entry'
+                    AND CONSTRAINT_TYPE = 'UNIQUE'",
+                "{$wpdb->prefix}home_promo_counted"
+            ));
+            if ($key_exists > 0) {
+                $wpdb->query("ALTER TABLE {$wpdb->prefix}home_promo_counted DROP KEY uq_entry");
+            }
+        }
+
         // --- InnoDB check for counted table ---
         $engine = $wpdb->get_var($wpdb->prepare(
             "SELECT ENGINE FROM information_schema.TABLES

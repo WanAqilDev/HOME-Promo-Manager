@@ -129,6 +129,8 @@ class HookDispatcher
             'entry_id'          => $entry_id,
             'daftar'            => $daftar,
             'prev_daftar'       => $prev_daftar,
+            'daftar_trigger'    => $mgr->s('daftar_trigger_value') ?? 'Ya',
+            'pasif_threshold'   => (int) ($mgr->s('passive_threshold_days') ?? 90),
             'status'            => ($status !== null) ? (int) $status : null,
             'prev_status'       => ($prev_status !== null) ? (int) $prev_status : null,
             'status_label'      => $status_label,

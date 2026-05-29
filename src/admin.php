@@ -14,6 +14,11 @@ if (!defined('ABSPATH'))
 
 // AJAX handler for realtime stats updates
 add_action('wp_ajax_hpm_get_realtime_stats', function() {
+    if (!current_user_can(CampaignEngine::CAP)) {
+        wp_send_json_error('Insufficient permissions.', 403);
+    }
+    check_ajax_referer('hpm_realtime_stats');
+
     $code_stats_array = DB::get_code_stats();
     $mgr = Manager::get_instance();
     $promo_codes = $mgr->s('promo_codes') ?: [];
@@ -344,7 +349,7 @@ function hpm_render_settings_tab(): void
             <div class="hpm-card">
                 <h3>Status</h3>
                 <div class="hpm-stat <?php echo $status_class; ?>"><?php echo $status_text; ?></div>
-                <p><?php echo $opts['start']; ?> - <?php echo $opts['end']; ?></p>
+                <p><?php echo esc_html($opts['start']); ?> – <?php echo esc_html($opts['end']); ?></p>
             </div>
             <div class="hpm-card">
                 <h3>Slots Used</h3>
@@ -579,7 +584,7 @@ function hpm_render_settings_tab(): void
                                     $tzlist = \DateTimeZone::listIdentifiers();
                                     foreach ($tzlist as $tz) {
                                         $selected = ($opts['timezone'] === $tz) ? 'selected' : '';
-                                        echo "<option value='{$tz}' {$selected}>{$tz}</option>";
+                                        echo '<option value="' . esc_attr($tz) . '" ' . $selected . '>' . esc_html($tz) . '</option>';
                                     }
                                     ?>
                                 </select>
@@ -680,6 +685,7 @@ function hpm_render_settings_tab(): void
         </div>
 
         <script>
+        const hpmStatsNonce = '<?php echo wp_create_nonce('hpm_realtime_stats'); ?>';
         jQuery(document).ready(function($) {
             // Toggle Mode Functionality - FIXED
             $('.hpm-mode-toggle-btn').on('click', function(e) {
@@ -921,7 +927,8 @@ function hpm_render_settings_tab(): void
                     url: '<?php echo admin_url('admin-ajax.php'); ?>',
                     type: 'POST',
                     data: {
-                        action: 'hpm_get_realtime_stats'
+                        action: 'hpm_get_realtime_stats',
+                        _ajax_nonce: hpmStatsNonce
                     },
                     success: function(response) {
                         if (response.success && response.data) {
@@ -1045,14 +1052,27 @@ function hpm_render_campaigns_tab(): void {
 }
 
 function hpm_campaign_actions_html(int $id, string $status, bool $is_active_ptr): string {
-    $base = '?page=home-promo-manager&tab=campaigns';
-    $html = "<a href='{$base}&action=edit&campaign_id={$id}'>Edit</a> | ";
+    $base = admin_url('options-general.php?page=home-promo-manager&tab=campaigns');
+    $edit_url = esc_url(add_query_arg(['action' => 'edit', 'campaign_id' => $id], $base));
+    $html = "<a href='{$edit_url}'>Edit</a> | ";
     if (!$is_active_ptr) {
-        $html .= "<a href='{$base}&action=activate&campaign_id={$id}'>Activate</a> | ";
+        $activate_url = esc_url(wp_nonce_url(
+            add_query_arg(['action' => 'activate', 'campaign_id' => $id], $base),
+            "hpm_campaign_activate_{$id}"
+        ));
+        $html .= "<a href='{$activate_url}'>Activate</a> | ";
     } else {
-        $html .= "<a href='{$base}&action=deactivate&campaign_id={$id}'>Deactivate</a> | ";
+        $deactivate_url = esc_url(wp_nonce_url(
+            add_query_arg(['action' => 'deactivate', 'campaign_id' => $id], $base),
+            "hpm_campaign_deactivate_{$id}"
+        ));
+        $html .= "<a href='{$deactivate_url}'>Deactivate</a> | ";
     }
-    $html .= "<a href='{$base}&action=delete&campaign_id={$id}' onclick='return confirm(\"Delete?\")'>Delete</a>";
+    $delete_url = esc_url(wp_nonce_url(
+        add_query_arg(['action' => 'delete', 'campaign_id' => $id], $base),
+        "hpm_campaign_delete_{$id}"
+    ));
+    $html .= "<a href='{$delete_url}' onclick='return confirm(\"Delete?\")'>Delete</a>";
     return $html;
 }
 
@@ -1097,7 +1117,12 @@ function hpm_handle_campaign_actions(): void {
     if (!in_array($hpm_action, ['save_new','save_edit','activate','deactivate','delete'], true)) return;
 
     hpm_admin_guard();
-    check_admin_referer('hpm_campaign_save');
+    if (in_array($hpm_action, ['save_new', 'save_edit'], true)) {
+        check_admin_referer('hpm_campaign_save');
+    } else {
+        $campaign_id_for_nonce = (int) ($_GET['campaign_id'] ?? 0);
+        check_admin_referer("hpm_campaign_{$hpm_action}_{$campaign_id_for_nonce}");
+    }
 
     if ($hpm_action === 'save_new' || $hpm_action === 'save_edit') {
         $data  = hpm_sanitise_campaign_fields($_POST);
