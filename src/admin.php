@@ -1143,10 +1143,10 @@ function hpm_render_logs_tab(): void
     $log_entry  = isset($_GET['log_entry']) && $_GET['log_entry'] !== ''
                   ? (int) $_GET['log_entry'] : null;
 
-    $total       = DB::count_status_log($log_entry);
+    $total       = DB::count_enrollment_log($log_entry);
     $total_pages = max(1, (int) ceil($total / $per_page));
     $log_page    = min($log_page, $total_pages);
-    $rows        = DB::get_status_log_page($log_page, $per_page, $log_entry);
+    $rows        = DB::get_enrollment_log_page($log_page, $per_page, $log_entry);
 
     $reacts = $wpdb->get_results(
         "SELECT entry_id, old_status, new_status, pasif_date, reactivated_at, promo_code
@@ -1155,7 +1155,7 @@ function hpm_render_logs_tab(): void
         ARRAY_A
     ) ?: [];
     ?>
-    <h2>Status Log</h2>
+    <h2>Enrollment Log</h2>
 
     <!-- Filter form -->
     <form method="get" style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">
@@ -1178,32 +1178,37 @@ function hpm_render_logs_tab(): void
         <thead>
             <tr>
                 <th style="width:100px;">Entry ID</th>
-                <th style="width:130px;">From</th>
-                <th style="width:130px;">To</th>
-                <th>Logged At</th>
+                <th style="width:130px;">Promo Code</th>
+                <th style="width:120px;">Branch</th>
+                <th style="width:130px;">Category</th>
+                <th>Enrolled At</th>
             </tr>
         </thead>
         <tbody>
         <?php if (empty($rows)): ?>
-            <tr><td colspan="4" style="text-align:center;color:#646970;padding:20px;">No log entries found.</td></tr>
+            <tr><td colspan="5" style="text-align:center;color:#646970;padding:20px;">No enrollment records found.</td></tr>
         <?php else: ?>
             <?php foreach ($rows as $row): ?>
             <tr>
                 <td><code><?php echo (int) $row['entry_id']; ?></code></td>
-                <td style="color:#646970;"><?php echo $row['from_status'] ? esc_html($row['from_status']) : '—'; ?></td>
+                <td><?php echo $row['promo_code'] ? esc_html($row['promo_code']) : '<span style="color:#646970;">—</span>'; ?></td>
+                <td style="color:#646970;"><?php echo $row['branch'] ? esc_html($row['branch']) : '—'; ?></td>
                 <td>
                     <?php
-                    $to = esc_html($row['to_status']);
-                    $color = match($row['to_status']) {
-                        'Aktif'  => '#00a32a',
-                        'Pasif'  => '#2271b1',
-                        default  => '#1d2327',
+                    $cat = esc_html($row['user_category'] ?: '—');
+                    $color = match($row['user_category']) {
+                        'new'          => '#00a32a',
+                        'diagnosed',
+                        'diagnostic'   => '#2271b1',
+                        'reactivation',
+                        'passive'      => '#d63638',
+                        default        => '#646970',
                     };
-                    echo "<span style='color:{$color}; font-weight:600;'>{$to}</span>";
+                    echo "<span style='color:{$color}; font-weight:600;'>{$cat}</span>";
                     ?>
                 </td>
                 <td style="font-family:monospace; color:#646970; font-size:12px;">
-                    <?php echo esc_html($row['logged_at']); ?>
+                    <?php echo esc_html($row['created_at']); ?>
                 </td>
             </tr>
             <?php endforeach; ?>

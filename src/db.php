@@ -524,6 +524,43 @@ class DB
         return (int) $wpdb->get_var("SELECT COUNT(*) FROM {$log_table}");
     }
 
+    public static function get_enrollment_log_page(int $page, int $per_page, ?int $entry_filter): array
+    {
+        global $wpdb;
+        $table  = $wpdb->prefix . 'home_promo_counted';
+        $offset = max(0, ($page - 1) * $per_page);
+        if ($entry_filter !== null) {
+            return $wpdb->get_results($wpdb->prepare(
+                "SELECT id, entry_id, promo_code, branch, user_category, created_at
+                   FROM {$table}
+                  WHERE entry_id = %d
+                  ORDER BY created_at DESC
+                  LIMIT %d OFFSET %d",
+                $entry_filter, $per_page, $offset
+            ), ARRAY_A) ?: [];
+        }
+        return $wpdb->get_results($wpdb->prepare(
+            "SELECT id, entry_id, promo_code, branch, user_category, created_at
+               FROM {$table}
+              ORDER BY created_at DESC
+              LIMIT %d OFFSET %d",
+            $per_page, $offset
+        ), ARRAY_A) ?: [];
+    }
+
+    public static function count_enrollment_log(?int $entry_filter = null): int
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'home_promo_counted';
+        if ($entry_filter !== null) {
+            return (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$table} WHERE entry_id = %d",
+                $entry_filter
+            ));
+        }
+        return (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table}");
+    }
+
     /**
      * Check if entry exists in promo tracking table
      * 
