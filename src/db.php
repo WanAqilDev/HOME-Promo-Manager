@@ -461,6 +461,69 @@ class DB
         return (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table}");
     }
 
+    public static function count_reactivations_for_campaign(int $campaign_id): int
+    {
+        global $wpdb;
+        $table = self::reactivation_table_name();
+        return (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE campaign_id = %d",
+            $campaign_id
+        ));
+    }
+
+    public static function get_category_stats_for_campaign(int $campaign_id): array
+    {
+        global $wpdb;
+        $table = self::table_name();
+        $results = $wpdb->get_results($wpdb->prepare(
+            "SELECT user_category, COUNT(*) AS count
+               FROM {$table}
+              WHERE campaign_id = %d
+                AND user_category != ''
+              GROUP BY user_category
+              ORDER BY count DESC",
+            $campaign_id
+        ), ARRAY_A);
+        return $results ?: [];
+    }
+
+    public static function get_status_log_page(int $page, int $per_page, ?int $entry_filter): array
+    {
+        global $wpdb;
+        $log_table = $wpdb->prefix . 'home_promo_status_log';
+        $offset    = max(0, ($page - 1) * $per_page);
+        if ($entry_filter !== null) {
+            return $wpdb->get_results($wpdb->prepare(
+                "SELECT id, entry_id, from_status, to_status, logged_at
+                   FROM {$log_table}
+                  WHERE entry_id = %d
+                  ORDER BY logged_at DESC
+                  LIMIT %d OFFSET %d",
+                $entry_filter, $per_page, $offset
+            ), ARRAY_A) ?: [];
+        }
+        return $wpdb->get_results($wpdb->prepare(
+            "SELECT id, entry_id, from_status, to_status, logged_at
+               FROM {$log_table}
+              ORDER BY logged_at DESC
+              LIMIT %d OFFSET %d",
+            $per_page, $offset
+        ), ARRAY_A) ?: [];
+    }
+
+    public static function count_status_log(?int $entry_filter = null): int
+    {
+        global $wpdb;
+        $log_table = $wpdb->prefix . 'home_promo_status_log';
+        if ($entry_filter !== null) {
+            return (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$log_table} WHERE entry_id = %d",
+                $entry_filter
+            ));
+        }
+        return (int) $wpdb->get_var("SELECT COUNT(*) FROM {$log_table}");
+    }
+
     /**
      * Check if entry exists in promo tracking table
      * 
@@ -665,10 +728,15 @@ class DB
         }
 
         // --- wp_home_promo_reactivations additions ---
+        if (!self::column_exists("{$wpdb->prefix}home_promo_reactivations", 'campaign_id')) {
+            $wpdb->query(
+                "ALTER TABLE {$wpdb->prefix}home_promo_reactivations
+               ADD COLUMN campaign_id INT NULL DEFAULT NULL"
+            );
+        }
         if (!self::column_exists("{$wpdb->prefix}home_promo_reactivations", 'went_pasif_at')) {
             $wpdb->query(
                 "ALTER TABLE {$wpdb->prefix}home_promo_reactivations
-               ADD COLUMN campaign_id INT NULL DEFAULT NULL,
                ADD COLUMN went_pasif_at DATETIME NULL COMMENT 'UTC'"
             );
         }

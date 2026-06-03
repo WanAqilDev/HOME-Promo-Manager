@@ -243,8 +243,8 @@ class CampaignEngine
 
             $inserted = $wpdb->query($wpdb->prepare(
                 "INSERT IGNORE INTO {$wpdb->prefix}home_promo_counted
-                   (entry_id, campaign_id, promo_code, category, source, counted_at)
-                 VALUES (%d, %d, %s, %s, %s, UTC_TIMESTAMP())",
+                   (entry_id, campaign_id, promo_code, user_category, source)
+                 VALUES (%d, %d, %s, %s, %s)",
                 $ctx->entry_id, $campaign->id, $code_to_write, $category, $source
             ));
 
