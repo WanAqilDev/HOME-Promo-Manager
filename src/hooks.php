@@ -217,11 +217,15 @@ class HookDispatcher
         CampaignEngine::claim_slot($ctx);
     }
 
-    public static function on_after_update_entry(int $entry_id, array $values): void
+    public static function on_after_update_entry(int $entry_id, int $form_id): void
     {
-        $mgr     = Manager::get_instance();
-        $form_id = (int) ($values['form_id'] ?? 0);
+        $mgr = Manager::get_instance();
         if ($form_id !== (int) $mgr->s('form_id')) return;
+
+        $values = [
+            'form_id'   => $form_id,
+            'item_meta' => self::read_current_meta($entry_id),
+        ];
 
         // Log Pasif transition before building $ctx so the log row is visible
         // to build_ctx's status_log query within the same request.
