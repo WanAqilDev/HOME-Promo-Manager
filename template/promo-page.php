@@ -109,19 +109,22 @@ add_action('wp_head', function () {
     .hpm-corner-orange  { position: absolute; bottom: -110px; left: -80px; width: 260px; height: 260px; background: radial-gradient(circle at 45% 45%, #f9a94a, var(--hpm-orange)); border-radius: 50%; opacity: .6; }
     .hpm-corner-orange-2{ position: absolute; bottom: -50px; left: 130px; width: 130px; height: 130px; background: var(--hpm-orange); border-radius: 50%; opacity: .35; }
 
+    /* ─── GLOBAL VISIBILITY ─────────────────── */
+    .hpm-mag  { display: none; }
+    .hpm-cta  { display: none; }
+
     /* ─── PAGE GRID ─────────────────────────── */
     .hpm-page {
       position: relative; z-index: 1; min-height: 100vh;
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 1fr;
       grid-template-areas:
-        "hdr  hdr"
-        "hero hero"
-        "stp  mag"
-        "pill pill"
-        "cd   cd"
-        "cta  cta"
-        "ftr  ftr";
+        "hdr"
+        "hero"
+        "stp"
+        "pill"
+        "cd"
+        "ftr";
       padding: 0 16px 48px; gap: 0; align-items: start;
     }
     .hpm-header          { grid-area: hdr; }
@@ -135,22 +138,20 @@ add_action('wp_head', function () {
 
     @media (min-width: 768px) {
       .hpm-page {
-        grid-template-columns: 1fr 380px;
+        grid-template-columns: 1fr;
         grid-template-areas:
-          "hdr  hdr"
-          "hero mag"
-          "stp  mag"
-          "pill mag"
-          "cd   mag"
-          "cta  mag"
-          "ftr  mag";
-        padding: 0 60px 60px; column-gap: 48px;
+          "hdr"
+          "hero"
+          "stp"
+          "pill"
+          "cd"
+          "ftr";
+        padding: 0 60px 60px;
         max-width: 1400px; margin: 0 auto;
       }
-      .hpm-mag { align-self: center; }
     }
     @media (min-width: 1200px) {
-      .hpm-page { grid-template-columns: 1fr 460px; column-gap: 64px; padding: 0 80px 80px; }
+      .hpm-page { padding: 0 80px 80px; }
     }
 
     /* ─── HEADER ────────────────────────────── */
@@ -294,6 +295,18 @@ add_action('wp_head', function () {
     .hpm-inactive { display: flex; align-items: center; justify-content: center; min-height: 60vh; }
     .hpm-inactive p { font-family: 'Fredoka One', cursive; font-size: 1.2em; color: var(--hpm-navy); opacity: .45; }
 
+    /* ─── DESKTOP (≥1025px) ─────────────────── */
+    @media (min-width: 1025px) {
+      html, body.hpm-promo-body { overflow: hidden; }
+      .hpm-steps { display: none; }
+      .hpm-page  { justify-items: center; }
+      .hpm-header { justify-content: center; gap: 24px; }
+      .hpm-hero, .hpm-countdown, .hpm-footer { text-align: center; }
+      .hpm-footer { justify-content: center; }
+      .hpm-cd-label { text-align: center; }
+      .hpm-pill { justify-self: center; }
+    }
+
     /* ─── HIDE CORNERS on mobile + iPad ────── */
     @media (max-width: 1024px) {
       .hpm-corner-wrap { display: none; }
@@ -317,33 +330,12 @@ add_action('wp_head', function () {
 
     /* ─── MOBILE FIXES (≤767px) ─────────────── */
     @media (max-width: 767px) {
-      .hpm-page {
-        grid-template-columns: 1fr 130px;
-      }
-      .hpm-title-img {
-        width: min(380px, 98%);
-      }
-      .hpm-caption-img {
-        width: min(340px, 96%);
-      }
-      .hpm-mag-img {
-        width: 120px;
-      }
-      .hpm-cd-row {
-        flex-wrap: nowrap;
-        gap: 4px;
-      }
-      .hpm-cd-tile {
-        min-width: 52px;
-        padding: 8px 6px 6px;
-      }
-      .hpm-cd-digits {
-        font-size: 1.9em;
-      }
-      .hpm-cd-sep {
-        font-size: 1.8em;
-        padding-bottom: 18px;
-      }
+      .hpm-title-img   { width: min(380px, 98%); }
+      .hpm-caption-img { width: min(340px, 96%); }
+      .hpm-cd-row      { flex-wrap: nowrap; gap: 4px; }
+      .hpm-cd-tile     { min-width: 52px; padding: 8px 6px 6px; }
+      .hpm-cd-digits   { font-size: 1.9em; }
+      .hpm-cd-sep      { font-size: 1.8em; padding-bottom: 18px; }
     }
     </style>
     <?php
@@ -445,8 +437,9 @@ get_header();
   </div>
 
   <footer class="hpm-footer">
-    <span>homemathstherapy</span>
+    <span>HOME Maths Therapy</span>
     <span>www.home.edu.my</span>
+    <span>Powered by QCXIS Sdn Bhd</span>
   </footer>
 
 </div><!-- .hpm-page -->
