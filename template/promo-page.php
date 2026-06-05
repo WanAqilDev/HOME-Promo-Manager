@@ -167,8 +167,14 @@ add_action('wp_head', function () {
       letter-spacing: .05em; padding: 6px 16px; border-radius: 20px;
     }
 
+    /* ─── HEADER SPACER ─────────────────────── */
+    .hpm-header { padding-top: 28px; padding-bottom: 10px; }
+
     /* ─── HERO ──────────────────────────────── */
-    .hpm-hero { padding: 14px 0 0; position: relative; z-index: 10; }
+    .hpm-hero {
+      padding: 14px 0 0; position: relative; z-index: 10;
+      display: flex; flex-direction: column; align-items: center;
+    }
     .hpm-title-img {
       width: min(340px, 92%); display: block;
       filter: drop-shadow(0 4px 12px rgba(13,43,110,.15));
@@ -302,7 +308,7 @@ add_action('wp_head', function () {
       .hpm-page  { justify-items: center; }
       .hpm-header { justify-content: center; gap: 24px; }
       .hpm-hero, .hpm-countdown, .hpm-footer { text-align: center; }
-      .hpm-footer { justify-content: center; }
+      .hpm-footer { justify-content: center; margin-top: 8px; font-size: .7em; gap: 14px; }
       .hpm-cd-label { text-align: center; }
       .hpm-pill { justify-self: center; }
     }
