@@ -39,6 +39,18 @@ add_shortcode('hpm_promo_status', function ($atts) {
     return hpm_render_promo_status_block($row);
 });
 
+add_shortcode('hpm_enrollment_modal_auto', function () {
+    $entry_key = isset($_GET['kic']) ? sanitize_text_field($_GET['kic']) : '';
+    if (!$entry_key) return '';
+    global $wpdb;
+    $entry_id = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT id FROM {$wpdb->prefix}frm_items WHERE item_key = %s AND form_id = 13 LIMIT 1",
+        $entry_key
+    ));
+    if (!$entry_id) return '';
+    return do_shortcode('[hpm_enrollment_modal entry_id="' . $entry_id . '"]');
+});
+
 add_shortcode('hpm_enrollment_modal', function ($atts) {
     $atts     = shortcode_atts(['entry_id' => 0], $atts);
     $entry_id = (int) $atts['entry_id'];
