@@ -318,7 +318,7 @@ add_action('wp_head', function () {
     /* ─── MOBILE FIXES (≤767px) ─────────────── */
     @media (max-width: 767px) {
       .hpm-page {
-        grid-template-columns: 1fr 95px;
+        grid-template-columns: 1fr 130px;
       }
       .hpm-title-img {
         width: min(380px, 98%);
@@ -327,7 +327,7 @@ add_action('wp_head', function () {
         width: min(340px, 96%);
       }
       .hpm-mag-img {
-        width: 85px;
+        width: 120px;
       }
       .hpm-cd-row {
         flex-wrap: nowrap;
