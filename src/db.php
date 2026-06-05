@@ -40,7 +40,7 @@ class DB
         $charset = $wpdb->get_charset_collate();
 
         // Main counted entries table (SMART26 schema)
-        $sql = "CREATE TABLE IF NOT EXISTS {$table} (
+        $sql = "CREATE TABLE {$table} (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             entry_id BIGINT(20) UNSIGNED NOT NULL,
             promo_code VARCHAR(50) DEFAULT '',
@@ -57,7 +57,7 @@ class DB
         ) $charset;";
 
         // Reactivation tracking table
-        $sql2 = "CREATE TABLE IF NOT EXISTS {$reactivation_table} (
+        $sql2 = "CREATE TABLE {$reactivation_table} (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             entry_id BIGINT(20) UNSIGNED NOT NULL,
             old_status VARCHAR(50),
@@ -110,6 +110,7 @@ class DB
                 'final_price' => 148.00,
                 'admin_email' => get_option('admin_email'),
                 'debug_mode' => false,
+                'debug_outlet_user_id' => 0,  // WP User ID of outlet allowed to enroll when debug_mode=true
             ], '', 'no');
         }
 
@@ -131,7 +132,7 @@ class DB
         $reactivation_table = self::reactivation_table_name();
 
         // Check if reactivation table exists
-        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$reactivation_table}'");
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '" . $wpdb->esc_like($reactivation_table) . "'");
 
         if ($table_exists !== $reactivation_table) {
             error_log('[HPM] Reactivation table missing. Creating: ' . $reactivation_table);
@@ -157,7 +158,7 @@ class DB
             dbDelta($sql);
 
             error_log('[HPM] Table creation attempted. Checking result...');
-            $verify = $wpdb->get_var("SHOW TABLES LIKE '{$reactivation_table}'");
+            $verify = $wpdb->get_var("SHOW TABLES LIKE '" . $wpdb->esc_like($reactivation_table) . "'");
             if ($verify === $reactivation_table) {
                 error_log('[HPM] Table created successfully: ' . $reactivation_table);
             } else {
@@ -874,6 +875,8 @@ class DB
             'status_label_field_id' => 1617,
             'pasif_date_field_id'   => 1698,
             'promo_field_id'        => 3170,
+            'debug_mode'            => false,
+            'debug_outlet_user_id'  => 0,
         ];
 
         if (get_option('home_promo_manager_settings') === false) {

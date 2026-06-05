@@ -192,6 +192,19 @@ class CampaignEngine
         ));
         if ($already > 0) return ['status' => 'already_counted'];
 
+        // Debug mode: only the configured outlet's clients may enroll
+        $mgr = Manager::get_instance();
+        if ($mgr->s('debug_mode') && ($debug_uid = (int) $mgr->s('debug_outlet_user_id')) > 0) {
+            $outlet_uid = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT meta_value FROM {$wpdb->prefix}frm_item_metas
+                  WHERE item_id = %d AND field_id = 209 LIMIT 1",
+                $ctx->entry_id
+            ));
+            if ($outlet_uid !== $debug_uid) {
+                return ['status' => 'debug_blocked'];
+            }
+        }
+
         // Status check — fail-closed
         $status_ok_label = ((string) $ctx->status_label === 'Aktif');
         $status_ok_199   = ($ctx->status === 1);

@@ -174,7 +174,9 @@ function sanitize_settings($input)
     $out['start']               = sanitize_text_field($input['start']               ?? ($defaults['start']               ?? '2026-01-12 12:00:00'));
     $out['end']                 = sanitize_text_field($input['end']                 ?? ($defaults['end']                 ?? '2026-01-14 11:59:00'));
     $out['timezone']            = sanitize_text_field($input['timezone']            ?? ($defaults['timezone']            ?? 'Asia/Kuala_Lumpur'));
-    $out['debug_mode']          = isset($input['debug_mode']) ? (bool) $input['debug_mode'] : false;
+    $out['debug_mode']             = isset($input['debug_mode']) ? (bool) $input['debug_mode'] : false;
+    $out['debug_outlet_user_id']   = isset($input['debug_outlet_user_id']) ? absint($input['debug_outlet_user_id']) : absint($defaults['debug_outlet_user_id'] ?? 0);
+    $out['promo_page_url']         = isset($input['promo_page_url']) ? esc_url_raw(trim($input['promo_page_url'])) : esc_url_raw($defaults['promo_page_url'] ?? '');
 
     $out['form_id']             = isset($input['form_id'])             ? absint($input['form_id'])             : absint($defaults['form_id']             ?? 13);
     $out['promo_field_id']      = isset($input['promo_field_id'])      ? absint($input['promo_field_id'])      : absint($defaults['promo_field_id']      ?? 3170);
@@ -272,7 +274,15 @@ function hpm_render_admin_page(): void
         'logs'      => 'Logs',
         'debug'     => 'Debug',
     ];
-    echo '<div class="wrap"><h1>HOME Promo Manager</h1>';
+    $promo_page_url = esc_url((get_option('home_promo_manager_settings', []))['promo_page_url'] ?? '');
+    echo '<div class="wrap"><h1>HOME Promo Manager';
+    if ($promo_page_url) {
+        printf(
+            ' <a href="%s" target="_blank" rel="noopener" class="page-title-action">View Promo Page ↗</a>',
+            $promo_page_url
+        );
+    }
+    echo '</h1>';
     echo '<nav class="nav-tab-wrapper">';
     foreach ($tabs as $slug => $label) {
         $active = ($tab === $slug) ? ' nav-tab-active' : '';
@@ -877,6 +887,8 @@ function hpm_render_settings_tab(): void
         'end'                      => '2025-12-24 23:59:00',
         'timezone'                 => 'Asia/Kuala_Lumpur',
         'debug_mode'               => false,
+        'debug_outlet_user_id'     => 0,
+        'promo_page_url'           => '',
         'form_id'                  => 13,
         'promo_field_id'           => 3170,
         'daftar_field_id'          => 196,
@@ -1031,6 +1043,16 @@ function hpm_render_settings_tab(): void
             echo '<table class="form-table" role="presentation"><tbody>';
             ?>
             <tr>
+                <th><label for="hpm_promo_page_url">Promo Page URL</label></th>
+                <td>
+                    <input name="home_promo_manager_settings[promo_page_url]" type="url"
+                           id="hpm_promo_page_url"
+                           value="<?php echo esc_attr($opts['promo_page_url']); ?>" class="regular-text"
+                           placeholder="https://home.edu.my/promo/">
+                    <p class="description">URL of the public promo page. Adds a quick-access button to every admin tab header.</p>
+                </td>
+            </tr>
+            <tr>
                 <th><label for="hpm_email">Admin Email</label></th>
                 <td>
                     <input name="home_promo_manager_settings[admin_email]" type="email" id="hpm_email"
@@ -1053,9 +1075,18 @@ function hpm_render_settings_tab(): void
                     <label>
                         <input name="home_promo_manager_settings[debug_mode]" type="checkbox" id="hpm_debug"
                                value="1" <?php checked(1, $opts['debug_mode']); ?>>
-                        Enable debug logging to error_log
+                        Enable debug mode — restricts enrollment to the outlet below
                     </label>
-                    <p class="description">Can also be toggled from the <a href="?page=home-promo-manager&tab=debug">Debug tab</a> without a page reload.</p>
+                    <p class="description">When enabled, only the configured outlet's clients will be enrolled. Can also be toggled from the <a href="?page=home-promo-manager&tab=debug">Debug tab</a>.</p>
+                </td>
+            </tr>
+            <tr>
+                <th><label for="hpm_debug_outlet_user_id">Debug Outlet WP User ID</label></th>
+                <td>
+                    <input name="home_promo_manager_settings[debug_outlet_user_id]" type="number"
+                           id="hpm_debug_outlet_user_id" min="0"
+                           value="<?php echo esc_attr($opts['debug_outlet_user_id']); ?>" class="small-text">
+                    <p class="description">WP User ID of the outlet allowed to enroll when Debug Mode is on (field 209 on Form 13). Set to 0 to allow all. Find it at WP Admin → Users → hover username → check URL for <code>user_id=X</code>.</p>
                 </td>
             </tr>
             <?php echo '</tbody></table></details>'; ?>
