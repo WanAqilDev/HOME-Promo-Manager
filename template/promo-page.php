@@ -20,6 +20,14 @@ add_filter('body_class', function ($classes) {
     return $classes;
 });
 
+add_filter('pre_get_document_title', function () use ($campaign) {
+    $site = get_bloginfo('name');
+    if ($campaign) {
+        return esc_html($campaign->name) . ' – ' . $site;
+    }
+    return 'Promo – ' . $site;
+});
+
 add_action('wp_head', function () {
     ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -41,6 +49,12 @@ add_action('wp_head', function () {
       font-family: 'Nunito', sans-serif;
       background: linear-gradient(180deg, #c2e8f8 0%, #d9f0fb 55%, #b0ddf0 100%) fixed;
       margin: 0; padding: 0;
+    }
+
+    /* Hide theme fixed header on promo page — standalone landing page */
+    body.hpm-promo-body #header-fixed,
+    body.hpm-promo-body #footer-fixed {
+      display: none !important;
     }
 
     /* ─── BACKGROUND DECO ───────────────────── */
@@ -279,6 +293,38 @@ add_action('wp_head', function () {
     /* ─── INACTIVE ───────────────────────────── */
     .hpm-inactive { display: flex; align-items: center; justify-content: center; min-height: 60vh; }
     .hpm-inactive p { font-family: 'Fredoka One', cursive; font-size: 1.2em; color: var(--hpm-navy); opacity: .45; }
+
+    /* ─── MOBILE FIXES (≤767px) ─────────────── */
+    @media (max-width: 767px) {
+      .hpm-page {
+        grid-template-columns: 1fr 120px;
+      }
+      .hpm-mag-img {
+        width: 110px;
+      }
+      .hpm-cd-row {
+        flex-wrap: nowrap;
+        gap: 4px;
+      }
+      .hpm-cd-tile {
+        min-width: 52px;
+        padding: 8px 6px 6px;
+      }
+      .hpm-cd-digits {
+        font-size: 1.9em;
+      }
+      .hpm-cd-sep {
+        font-size: 1.8em;
+        padding-bottom: 18px;
+      }
+      .hpm-corner-green    { width: 190px; height: 190px; bottom: -55px; right: -44px; }
+      .hpm-corner-green-2  { width: 100px; height: 100px; bottom: -22px; right: 66px; }
+      .hpm-corner-blue     { width: 110px; height: 110px; top: -33px; right: -33px; }
+      .hpm-corner-pink     { width: 120px; height: 120px; top: -38px; left: -38px; }
+      .hpm-corner-pink-2   { width: 60px;  height: 60px;  top: -11px; left: 55px; }
+      .hpm-corner-orange   { width: 145px; height: 145px; bottom: -60px; left: -44px; }
+      .hpm-corner-orange-2 { width: 72px;  height: 72px;  bottom: -28px; left: 72px; }
+    }
     </style>
     <?php
 });

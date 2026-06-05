@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design Options</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --pink: #f02d7d; --lime: #5cbf2a; --lime-dark: #3d9a18;
+  --orange: #f5821f; --navy: #0d2b6e; --sky: #d6f0fb;
+}
+body {
+  font-family: 'Nunito', sans-serif;
+  background: #1e293b; color: #fff;
+  padding: 32px 20px;
+}
+h1 { font-family: 'Fredoka One', cursive; font-size: 1.4em; color: #f8fafc; margin-bottom: 6px; }
+.subtitle { font-size: .82em; color: #94a3b8; margin-bottom: 32px; }
+
+/* ── Section headers ── */
+.section-label {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.05em; color: #f59e0b;
+  letter-spacing: .04em; margin-bottom: 16px;
+  padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.options-row {
+  display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 48px;
+}
+.opt-card {
+  background: rgba(255,255,255,.05);
+  border: 1.5px solid rgba(255,255,255,.1);
+  border-radius: 16px; padding: 20px;
+  flex: 1; min-width: 220px; max-width: 300px;
+}
+.opt-label {
+  font-size: .7em; font-weight: 800; color: #64748b;
+  text-transform: uppercase; letter-spacing: .1em;
+  margin-bottom: 14px;
+}
+.opt-label span { color: #f59e0b; }
+
+/* sky bg preview patch */
+.sky-bg {
+  background: linear-gradient(160deg, #c8ecf8, #ddf2fc);
+  border-radius: 12px; padding: 16px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+
+/* ══════════════════════════════════════
+   SLOT COUNT OPTIONS
+══════════════════════════════════════ */
+
+/* Option A — Sticker / torn badge */
+.sticker {
+  position: relative;
+  background: var(--lime);
+  border-radius: 50% 50% 50% 50% / 55% 55% 45% 45%;
+  padding: 14px 20px 18px;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(61,154,24,.35);
+  width: 160px;
+}
+.sticker::before {
+  content: '';
+  position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
+  width: 30px; height: 16px;
+  background: var(--lime-dark);
+  border-radius: 0 0 4px 4px;
+  clip-path: polygon(0 0, 100% 0, 85% 100%, 15% 100%);
+}
+.sticker .st-title {
+  font-size: .6em; font-weight: 900; color: #fff;
+  text-transform: uppercase; letter-spacing: .1em;
+  opacity: .8; margin-bottom: 2px;
+}
+.sticker .st-count {
+  font-family: 'Fredoka One', cursive;
+  font-size: 2em; color: #fff; line-height: 1;
+}
+.sticker .st-denom {
+  font-size: .65em; color: rgba(255,255,255,.7); font-weight: 800;
+}
+.sticker .st-bar-wrap {
+  background: rgba(0,0,0,.15); border-radius: 100px;
+  height: 5px; overflow: hidden; margin-top: 6px; width: 80%; margin-left: auto; margin-right: auto;
+}
+.sticker .st-bar {
+  height: 100%; border-radius: 100px; width: 66.7%;
+  background: rgba(255,255,255,.7);
+}
+
+/* Option B — Horizontal ticker strip */
+.ticker-strip {
+  background: var(--navy);
+  border-radius: 14px;
+  padding: 12px 16px;
+  width: 100%;
+}
+.ticker-strip .tk-top {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.ticker-strip .tk-label {
+  font-size: .68em; font-weight: 800; color: rgba(255,255,255,.45);
+  text-transform: uppercase; letter-spacing: .1em;
+}
+.ticker-strip .tk-count {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.1em; color: var(--lime);
+}
+.ticker-strip .tk-bar-wrap {
+  background: rgba(255,255,255,.1); border-radius: 100px;
+  height: 10px; overflow: hidden;
+}
+.ticker-strip .tk-bar {
+  height: 100%; border-radius: 100px; width: 66.7%;
+  background: linear-gradient(90deg, var(--lime-dark), var(--lime));
+  position: relative;
+}
+.ticker-strip .tk-bar::after {
+  content: ''; position: absolute; right: 0; top: 0; bottom: 0;
+  width: 20px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.3));
+}
+.ticker-strip .tk-bottom {
+  display: flex; justify-content: space-between;
+  font-size: .65em; color: rgba(255,255,255,.35); margin-top: 5px; font-weight: 700;
+}
+
+/* Option C — Floating pill tag */
+.pill-tag {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: #fff;
+  border-radius: 100px;
+  padding: 8px 16px 8px 8px;
+  box-shadow: 0 4px 16px rgba(13,43,110,.15);
+}
+.pill-tag .pt-icon {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--pink);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .95em; flex-shrink: 0;
+}
+.pill-tag .pt-text { font-size: .8em; }
+.pill-tag .pt-big {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.3em; color: var(--pink); line-height: 1;
+  display: block;
+}
+.pill-tag .pt-sub {
+  font-size: .68em; color: var(--navy); opacity: .5;
+  font-weight: 800; display: block;
+}
+
+/* ══════════════════════════════════════
+   STEP BUBBLES OPTIONS
+══════════════════════════════════════ */
+
+/* Option A — Bold colored full-bleed cards */
+.step-bold {
+  width: 100%; display: flex; flex-direction: column; gap: 8px;
+}
+.step-bold-card {
+  border-radius: 14px; padding: 12px 14px;
+  display: flex; align-items: center; gap: 12px;
+}
+.step-bold-card.s1 { background: var(--pink); }
+.step-bold-card.s2 { background: var(--lime); }
+.step-bold-card .sbc-num {
+  font-family: 'Fredoka One', cursive;
+  font-size: 2em; color: rgba(255,255,255,.35); line-height: 1;
+  flex-shrink: 0; width: 32px; text-align: center;
+}
+.step-bold-card .sbc-icon {
+  font-size: 1.5em; flex-shrink: 0;
+}
+.step-bold-card .sbc-text {
+  font-size: .82em; color: #fff; font-weight: 800; line-height: 1.35;
+}
+.step-bold-card .sbc-text em { font-style: normal; color: rgba(255,255,255,.65); font-weight: 700; font-size: .9em; }
+
+/* Option B — Icon-forward vertical tiles */
+.step-tiles {
+  width: 100%; display: flex; flex-direction: column; gap: 8px;
+}
+.step-tile {
+  background: rgba(255,255,255,.9);
+  border-radius: 14px; padding: 10px 12px;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.step-tile .st-circle {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3em;
+  box-shadow: 0 3px 8px rgba(0,0,0,.12);
+}
+.step-tile.t1 .st-circle { background: var(--pink); }
+.step-tile.t2 .st-circle { background: var(--orange); }
+.step-tile .st-body {}
+.step-tile .st-step {
+  font-size: .62em; font-weight: 900; color: var(--navy); opacity: .4;
+  text-transform: uppercase; letter-spacing: .1em; margin-bottom: 1px;
+}
+.step-tile .st-main {
+  font-size: .83em; font-weight: 800; color: var(--navy); line-height: 1.35;
+}
+.step-tile .st-main strong { color: var(--pink); }
+.step-tile.t2 .st-main strong { color: var(--orange); }
+
+/* Option C — Horizontal dual card */
+.step-duo {
+  width: 100%; display: flex; gap: 8px;
+}
+.step-duo-card {
+  flex: 1; border-radius: 14px; padding: 14px 10px;
+  text-align: center;
+  background: rgba(255,255,255,.85);
+}
+.step-duo-card .sd-icon { font-size: 1.8em; margin-bottom: 4px; display: block; }
+.step-duo-card .sd-num {
+  font-family: 'Fredoka One', cursive;
+  font-size: .7em; color: rgba(13,43,110,.3);
+  letter-spacing: .1em;
+}
+.step-duo-card .sd-text {
+  font-size: .74em; font-weight: 800; color: var(--navy); line-height: 1.3;
+  margin-top: 2px;
+}
+.step-duo-card .sd-text strong { color: var(--pink); }
+.step-duo-card.d2 .sd-text strong { color: var(--lime-dark); }
+.step-duo-card.d1 { border-top: 3px solid var(--pink); }
+.step-duo-card.d2 { border-top: 3px solid var(--lime); }
+</style>
+</head>
+<body>
+
+<h1>Design Options</h1>
+<p class="subtitle">Slot count display · Step bubbles redesign — pick a direction from each section</p>
+
+<!-- ══════════════════════════════════════
+     SECTION 1: SLOT COUNT DISPLAY
+══════════════════════════════════════ -->
+<div class="section-label">① Slot count display — <span>pick one</span></div>
+<div class="options-row">
+
+  <!-- A: Sticker -->
+  <div class="opt-card">
+    <div class="opt-label">Option <span>A</span> — Blob sticker</div>
+    <div class="sky-bg">
+      <div class="sticker">
+        <div class="st-title">Pendaftaran</div>
+        <div class="st-count">220</div>
+        <div class="st-denom">/ 330 digunakan</div>
+        <div class="st-bar-wrap"><div class="st-bar"></div></div>
+      </div>
+    </div>
+    <p style="font-size:.75em;color:#64748b;margin-top:10px;line-height:1.5;">Organic blob shape, lime green, sits below the magnifier as its own element. Playful sticker feel matching poster energy.</p>
+  </div>
+
+  <!-- B: Ticker strip -->
+  <div class="opt-card">
+    <div class="opt-label">Option <span>B</span> — Dark ticker strip</div>
+    <div class="sky-bg">
+      <div class="ticker-strip">
+        <div class="tk-top">
+          <span class="tk-label">Slot digunakan</span>
+          <span class="tk-count">220 / 330</span>
+        </div>
+        <div class="tk-bar-wrap"><div class="tk-bar"></div></div>
+        <div class="tk-bottom">
+          <span>0</span>
+          <span>110 slot lagi!</span>
+          <span>330</span>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:.75em;color:#64748b;margin-top:10px;line-height:1.5;">Horizontal progress strip on navy bg. Shows remaining slots clearly. More information-dense and reads at a glance.</p>
+  </div>
+
+  <!-- C: Pill tag -->
+  <div class="opt-card">
+    <div class="opt-label">Option <span>C</span> — Floating pill</div>
+    <div class="sky-bg">
+      <div class="pill-tag">
+        <div class="pt-icon">🎯</div>
+        <div class="pt-text">
+          <span class="pt-big">110 slot lagi!</span>
+          <span class="pt-sub">220 / 330 digunakan</span>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:.75em;color:#64748b;margin-top:10px;line-height:1.5;">White pill badge floating near the magnifier. Highlights <em>remaining</em> slots rather than used. Creates urgency.</p>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════
+     SECTION 2: STEP BUBBLES
+══════════════════════════════════════ -->
+<div class="section-label">② Step bubbles redesign — <span>pick one</span></div>
+<div class="options-row">
+
+  <!-- A: Bold colored cards -->
+  <div class="opt-card">
+    <div class="opt-label">Option <span>A</span> — Bold color cards</div>
+    <div class="sky-bg">
+      <div class="step-bold">
+        <div class="step-bold-card s1">
+          <div class="sbc-num">1</div>
+          <div class="sbc-icon">🔍</div>
+          <div class="sbc-text">Comment one of the <em>HOME 6 Principles</em></div>
+        </div>
+        <div class="step-bold-card s2">
+          <div class="sbc-num">2</div>
+          <div class="sbc-icon">🎁</div>
+          <div class="sbc-text">Redeem <em>RM33 OFF</em> your registration</div>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:.75em;color:#64748b;margin-top:10px;line-height:1.5;">Full-bleed pink + lime green cards. Big ghost number, icon, text. High contrast. Energetic, matches poster palette.</p>
+  </div>
+
+  <!-- B: Icon-forward tiles -->
+  <div class="opt-card">
+    <div class="opt-label">Option <span>B</span> — Icon-forward tiles</div>
+    <div class="sky-bg">
+      <div class="step-tiles">
+        <div class="step-tile t1">
+          <div class="st-circle">🔍</div>
+          <div class="st-body">
+            <div class="st-step">Langkah 1</div>
+            <div class="st-main">Comment one of the <strong>HOME 6 Principles</strong></div>
+          </div>
+        </div>
+        <div class="step-tile t2">
+          <div class="st-circle">🎁</div>
+          <div class="st-body">
+            <div class="st-step">Langkah 2</div>
+            <div class="st-main">Redeem <strong>RM33 OFF</strong> your registration</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:.75em;color:#64748b;margin-top:10px;line-height:1.5;">Frosted white cards with large coloured icon circle, "Langkah 1/2" label, main text. Cleaner than current, more structured.</p>
+  </div>
+
+  <!-- C: Horizontal duo -->
+  <div class="opt-card">
+    <div class="opt-label">Option <span>C</span> — Side-by-side duo</div>
+    <div class="sky-bg">
+      <div class="step-duo">
+        <div class="step-duo-card d1">
+          <span class="sd-icon">💬</span>
+          <div class="sd-num">STEP 01</div>
+          <div class="sd-text">Comment on <strong>HOME 6 Principles</strong></div>
+        </div>
+        <div class="step-duo-card d2">
+          <span class="sd-icon">✂️</span>
+          <div class="sd-num">STEP 02</div>
+          <div class="sd-text">Redeem <strong>RM33 OFF</strong></div>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:.75em;color:#64748b;margin-top:10px;line-height:1.5;">Two equal-width cards side-by-side. Centred icon + step number + text. More compact, works well with the magnifier on the right.</p>
+  </div>
+
+</div>
+
+</body>
+</html>

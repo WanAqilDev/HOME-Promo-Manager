@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HPM Visual Preview</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --amber: #f5a623;
+    --amber-dark: #d4891a;
+    --dark: #0d0d0d;
+    --dark2: #1a1a1a;
+    --dark3: #242424;
+    --card-bg: #f9fafb;
+    --border: #e5e7eb;
+    --text: #111827;
+    --muted: #6b7280;
+    --blue: #3b82f6;
+    --yellow: #f59e0b;
+    --purple: #8b5cf6;
+    --green: #16a34a;
+
+    /* 6CURE theme */
+    --pink: #f02d7d;
+    --pink-dark: #c4185e;
+    --lime: #5cbf2a;
+    --lime-dark: #3d9a18;
+    --orange: #f5821f;
+    --sky: #d6f0fb;
+    --sky-mid: #a8dff5;
+    --navy: #0d2b6e;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f3f4f6;
+    color: var(--text);
+  }
+
+  /* ── Nav tabs ── */
+  .tab-bar {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; gap: 4px;
+    background: #1e293b; padding: 12px 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  }
+  .tab-bar button {
+    background: transparent; border: none; cursor: pointer;
+    color: #94a3b8; padding: 8px 20px; border-radius: 6px;
+    font-size: .9em; font-weight: 600; letter-spacing: .03em;
+    transition: background .15s, color .15s;
+  }
+  .tab-bar button.active { background: var(--amber); color: #000; }
+  .tab-bar button:hover:not(.active) { background: #334155; color: #fff; }
+
+  .tab-panel { display: none; padding: 40px 24px; max-width: 900px; margin: 0 auto; }
+  .tab-panel.active { display: block; }
+
+  h2 { font-size: 1.4em; margin-bottom: 24px; color: #1e293b; }
+  h3 { font-size: 1.05em; margin-bottom: 12px; color: #374151; }
+
+  /* ─────────────────────────────────────────────
+     TAB 1 — FLOW DIAGRAM
+  ───────────────────────────────────────────── */
+  .flow-wrap {
+    background: #fff; border-radius: 12px; padding: 32px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .flow-row {
+    display: flex; align-items: flex-start; gap: 0;
+    justify-content: center; flex-wrap: wrap; margin-bottom: 0;
+  }
+  .flow-node {
+    background: #f8fafc; border: 2px solid #cbd5e1;
+    border-radius: 10px; padding: 14px 18px; min-width: 180px; max-width: 200px;
+    text-align: center; position: relative;
+  }
+  .flow-node .form-id {
+    font-size: .7em; font-weight: 700; color: var(--blue);
+    text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px;
+  }
+  .flow-node .form-name { font-weight: 700; font-size: .95em; color: #1e293b; margin-bottom: 4px; }
+  .flow-node .form-desc { font-size: .78em; color: var(--muted); line-height: 1.4; }
+
+  .flow-node.highlight { border-color: var(--amber); background: #fffbf0; }
+  .flow-node.inject { border-color: var(--green); background: #f0fdf4; }
+
+  .flow-arrow {
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 8px; font-size: 1.4em; color: #94a3b8; align-self: center;
+  }
+  .flow-arrow.down {
+    flex-direction: column; padding: 6px 0; width: 100%;
+    text-align: center; color: #94a3b8;
+  }
+
+  .flow-col { display: flex; flex-direction: column; align-items: center; }
+
+  .badge {
+    display: inline-block; font-size: .7em; font-weight: 700;
+    padding: 2px 8px; border-radius: 20px; margin-top: 6px;
+  }
+  .badge.hpm { background: var(--amber); color: #000; }
+  .badge.view { background: #dbeafe; color: #1e40af; }
+  .badge.inject { background: #dcfce7; color: #166534; }
+
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap; margin-top: 24px;
+    padding-top: 20px; border-top: 1px solid var(--border);
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: .82em; color: var(--muted); }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+  .detail-box {
+    background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 18px; margin-top: 20px; font-size: .85em;
+  }
+  .detail-box h4 { font-size: .9em; color: #374151; margin-bottom: 8px; }
+  .detail-box code {
+    background: #e2e8f0; border-radius: 4px; padding: 1px 6px;
+    font-family: 'Consolas', monospace; font-size: .92em; color: #1e293b;
+  }
+  .detail-box table { width: 100%; border-collapse: collapse; }
+  .detail-box td { padding: 4px 8px 4px 0; vertical-align: top; }
+  .detail-box td:first-child { color: var(--muted); white-space: nowrap; width: 160px; }
+
+  /* ─────────────────────────────────────────────
+     TAB 2 — PROMO STATUS BLOCK
+  ───────────────────────────────────────────── */
+  .client-page-mock {
+    background: #fff; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .client-page-mock .page-header {
+    background: #1e293b; color: #fff; padding: 12px 20px;
+    font-size: .82em; display: flex; align-items: center; gap: 10px;
+  }
+  .client-page-mock .page-header .url { color: #94a3b8; font-family: monospace; }
+  .client-page-mock .page-body { padding: 24px; }
+
+  .m-ds-section {
+    border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; margin-bottom: 16px;
+  }
+  .m-ds-section .section-title {
+    background: #f1f5f9; padding: 8px 14px;
+    font-weight: 700; font-size: .82em;
+    text-transform: uppercase; letter-spacing: .06em; color: #475569;
+    border-bottom: 1px solid var(--border);
+  }
+  .m-ds-section .section-body { padding: 12px 14px; font-size: .88em; }
+  .m-ds-section .row { display: flex; gap: 8px; margin-bottom: 6px; }
+  .m-ds-section .row .label { color: var(--muted); min-width: 120px; }
+
+  .hpm-promo-status-block {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 16px; margin: 12px 0; background: var(--card-bg);
+  }
+  .hpm-promo-status-block .block-title {
+    font-weight: 600; margin-bottom: 8px; font-size: .8em;
+    text-transform: uppercase; letter-spacing: .05em; color: #374151;
+  }
+  .hpm-enrolled { color: var(--green); margin-bottom: 8px; font-weight: 500; }
+  .hpm-not-enrolled { color: var(--muted); }
+  .hpm-table { font-size: .88em; border-collapse: collapse; width: 100%; }
+  .hpm-table td { padding: 3px 8px 3px 0; vertical-align: middle; }
+  .hpm-table td:first-child { color: var(--muted); white-space: nowrap; width: 90px; }
+  .cat-badge {
+    display: inline-block; color: #fff; border-radius: 4px;
+    padding: 2px 8px; font-size: .78em; font-weight: 600;
+  }
+
+  .states-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 8px; }
+  @media (max-width: 600px) { .states-grid { grid-template-columns: 1fr; } }
+
+  .state-card { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .state-card .state-label {
+    padding: 8px 14px; font-size: .78em; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .06em;
+  }
+  .state-card .state-label.enrolled { background: #dcfce7; color: #166534; }
+  .state-card .state-label.empty { background: #f1f5f9; color: #475569; }
+  .state-card .state-body { padding: 16px; }
+
+  /* ─────────────────────────────────────────────
+     TAB 3 — COUNTDOWN PAGE (6CURE theme)
+  ───────────────────────────────────────────── */
+  #countdown-page {
+    background: linear-gradient(160deg, #c8ecf8 0%, #e8f6fd 50%, #b8e5f5 100%);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 8px 40px rgba(13,43,110,.18);
+    max-width: 680px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  /* decorative bubble bg */
+  #countdown-page::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 10% 20%, rgba(240,45,125,.07) 0%, transparent 50%),
+      radial-gradient(circle at 90% 80%, rgba(92,191,42,.07) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .cp-inner {
+    padding: 36px 32px 40px;
+    text-align: center;
+    position: relative;
+  }
+
+  /* Full poster hero */
+  .cp-poster-hero {
+    width: 100%; border-radius: 14px; overflow: hidden;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(13,43,110,.12);
+  }
+  .cp-poster-hero img { width: 100%; display: block; }
+
+  /* Logo */
+  .cp-logo { margin-bottom: 4px; }
+  .cp-logo img { height: 80px; }
+
+  .cp-tagline {
+    font-size: 1em; color: var(--navy); font-weight: 600;
+    margin-bottom: 8px; opacity: .75;
+  }
+
+  /* Date badge */
+  .cp-date-badge {
+    display: inline-block;
+    background: var(--navy); color: #fff;
+    border-radius: 20px; padding: 5px 18px;
+    font-size: .8em; font-weight: 700; letter-spacing: .06em;
+    margin-bottom: 24px;
+  }
+
+  /* Countdown tiles */
+  .cp-countdown {
+    display: flex; justify-content: center; gap: 10px;
+    margin-bottom: 28px; flex-wrap: wrap;
+  }
+  .cp-tile {
+    background: #fff;
+    border-radius: 12px; padding: 12px 16px; min-width: 68px;
+    box-shadow: 0 2px 10px rgba(13,43,110,.1);
+  }
+  .cp-tile .digits {
+    font-size: 2.2em; font-weight: 900; color: var(--pink);
+    line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .cp-tile .unit {
+    font-size: .58em; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--navy); opacity: .5; margin-top: 4px;
+  }
+  .cp-sep {
+    font-size: 2em; color: var(--pink); align-self: center;
+    padding-bottom: 22px; line-height: 1; opacity: .5;
+  }
+
+  /* Slot section */
+  .cp-slot-section { margin-bottom: 24px; }
+  .cp-slot-bar-wrap {
+    background: rgba(13,43,110,.1); border-radius: 100px;
+    height: 12px; overflow: hidden; margin-bottom: 8px;
+  }
+  .cp-slot-bar-fill {
+    height: 100%; border-radius: 100px;
+    background: linear-gradient(90deg, var(--lime-dark), var(--lime));
+    transition: width .8s cubic-bezier(.34,1.56,.64,1);
+  }
+  .cp-slot-label { font-size: .84em; color: var(--navy); opacity: .7; }
+  .cp-slot-label strong { color: var(--lime-dark); font-weight: 800; }
+
+  /* Pricing + magnifier layout */
+  .cp-bottom-row {
+    display: flex; align-items: center; gap: 0;
+    background: #fff; border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(13,43,110,.1);
+    overflow: hidden; margin-bottom: 20px;
+  }
+  .cp-pricing {
+    flex: 1; display: flex; justify-content: center; gap: 0;
+    padding: 16px 8px; flex-wrap: wrap;
+  }
+  .cp-price-row { text-align: center; padding: 0 16px; }
+  .cp-price-row .price-label {
+    font-size: .68em; text-transform: uppercase; letter-spacing: .1em;
+    color: var(--navy); opacity: .45; margin-bottom: 2px; font-weight: 700;
+  }
+  .cp-price-row .price-val { font-size: 1.5em; font-weight: 900; color: var(--navy); }
+  .cp-price-row .price-val.strike { text-decoration: line-through; opacity: .3; font-weight: 600; }
+  .cp-price-row .price-val.promo { color: var(--pink); }
+  .cp-price-row .price-val.saving { color: var(--lime-dark); }
+  .cp-divider { width: 1px; background: rgba(13,43,110,.08); align-self: stretch; margin: 8px 0; }
+
+  .cp-magnifier {
+    width: 110px; flex-shrink: 0;
+    position: relative; overflow: visible;
+  }
+  .cp-magnifier img {
+    width: 140px; position: absolute;
+    right: -10px; bottom: -10px;
+    filter: drop-shadow(0 4px 8px rgba(13,43,110,.15));
+  }
+
+  .cp-cta {
+    font-size: .88em; color: var(--navy); opacity: .55; line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="tab-bar">
+  <button class="active" onclick="showTab('flow')">① Promo Flow</button>
+  <button onclick="showTab('status')">② Status Block</button>
+  <button onclick="showTab('countdown')">③ Countdown Page</button>
+</div>
+
+<!-- ════════════════════════════════════════════
+     TAB 1 — PROMO FLOW
+════════════════════════════════════════════ -->
+<div id="tab-flow" class="tab-panel active">
+  <h2>HPM Registration &amp; Promo Injection Flow</h2>
+
+  <div class="flow-wrap">
+    <div class="flow-col">
+
+      <!-- Form 41 -->
+      <div class="flow-node">
+        <div class="form-id">Form 41</div>
+        <div class="form-name">Penjaga — Daftar Diagnos</div>
+        <div class="form-desc">Guardian fills in child diagnosis + personal info</div>
+      </div>
+
+      <div class="flow-arrow down">↓</div>
+
+      <!-- Form 43 -->
+      <div class="flow-node">
+        <div class="form-id">Form 43</div>
+        <div class="form-name">Daftar Diagnos II</div>
+        <div class="form-desc">Client pre-registration. Passes <code style="font-size:.78em;background:#e2e8f0;padding:1px 4px;border-radius:3px;">kid=[id]</code> + <code style="font-size:.78em;background:#e2e8f0;padding:1px 4px;border-radius:3px;">dkey=[1132]</code> into Form 13 embed.</div>
+        <div class="badge view">View 747</div>
+      </div>
+
+      <div class="flow-arrow down">↓</div>
+
+      <!-- Form 13 -->
+      <div class="flow-node highlight">
+        <div class="form-id">Form 13</div>
+        <div class="form-name">Cawangan — Klien</div>
+        <div class="form-desc">Final client record. HPM hooks on <em>entry_created</em> here — writes promo code to field 3320.</div>
+        <div class="badge hpm">HPM trigger</div>
+      </div>
+
+    </div>
+
+    <!-- Detail boxes -->
+    <div class="detail-box" style="margin-top:24px;">
+      <h4>Form 13 Key Fields for HPM</h4>
+      <table>
+        <tr><td>Field 196</td><td>Daftar Klien? — trigger field, value <strong>"Ya"</strong></td></tr>
+        <tr><td>Field 199</td><td>Status (H) — 1=Aktif, 2=Pasif</td></tr>
+        <tr><td>Field 1698</td><td>Tarikh Menjadi Pasif</td></tr>
+        <tr><td>Field 3320</td><td><strong>Kod Promosi</strong> — where HPM writes the promo code <span style="color:#dc2626;font-weight:700;">⚠ live setting must be 3320, not 3170</span></td></tr>
+        <tr><td>Field 3398</td><td>FK → Form 43 entry_id</td></tr>
+        <tr><td>Field 4081</td><td>FK → Form 43 dkey</td></tr>
+        <tr><td>Field 209</td><td>Outlet WP User ID — authoritative ownership marker</td></tr>
+      </table>
+    </div>
+
+    <div class="detail-box" style="margin-top:12px;">
+      <h4>Injection Point — View 1663 (Outlet Admin client detail)</h4>
+      <table>
+        <tr><td>WP page</td><td>1661 — <code>/pc/klien/maklumat/kky/{item_key}/</code></td></tr>
+        <tr><td>View</td><td>1663 — Cawangan - Klien - Maklumat I</td></tr>
+        <tr><td>Shortcode</td><td><code>[hpm_promo_status entry_id="[id]"]</code></td></tr>
+        <tr><td>Position</td><td>After <code>[if 3320 not_equal=""]Promosi...[/if]</code>, before <code>&lt;h5&gt;Nama MT&lt;/h5&gt;</code></td></tr>
+        <tr><td><code>[id]</code></td><td>Formidable token → Form 13 entry_id → direct key in <code>home_promo_counted</code></td></tr>
+      </table>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#fffbf0;border:2px solid var(--amber);"></div> HPM trigger point</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#dbeafe;border:2px solid var(--blue);"></div> Formidable View</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#dcfce7;border:2px solid var(--green);"></div> Shortcode injection</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     TAB 2 — PROMO STATUS BLOCK
+════════════════════════════════════════════ -->
+<div id="tab-status" class="tab-panel">
+  <h2>Promo Status Block — <code>[hpm_promo_status entry_id="[id]"]</code></h2>
+
+  <p style="font-size:.88em;color:var(--muted);margin-bottom:24px;">
+    This block will be injected into View 1663's <code>frm_dyncontent</code> in the MAKLUMAT KELAS section.
+    Below: both states side-by-side, and a full client page mockup showing placement.
+  </p>
+
+  <div class="states-grid" style="margin-bottom:32px;">
+    <!-- ENROLLED -->
+    <div class="state-card">
+      <div class="state-label enrolled">✓ Enrolled state</div>
+      <div class="state-body">
+        <div class="hpm-promo-status-block">
+          <div class="block-title">Status Promo</div>
+          <p class="hpm-enrolled">✓ Klien ini telah menerima promo.</p>
+          <table class="hpm-table">
+            <tr>
+              <td>Kategori</td>
+              <td><span class="cat-badge" style="background:#3b82f6;">Baru</span></td>
+            </tr>
+            <tr>
+              <td>Kod Promo</td>
+              <td><strong>SMART26A</strong></td>
+            </tr>
+            <tr>
+              <td>Didaftar</td>
+              <td>1 Jun 2026, 10:30 pg</td>
+            </tr>
+          </table>
+        </div>
+        <p style="font-size:.72em;color:var(--muted);margin-top:4px;">Category: <strong>new</strong> (blue badge)</p>
+      </div>
+    </div>
+
+    <!-- DIAGNOSED variant -->
+    <div class="state-card">
+      <div class="state-label enrolled" style="background:#fef9c3;color:#854d0e;">~ Diagnosed variant</div>
+      <div class="state-body">
+        <div class="hpm-promo-status-block">
+          <div class="block-title">Status Promo</div>
+          <p class="hpm-enrolled">✓ Klien ini telah menerima promo.</p>
+          <table class="hpm-table">
+            <tr>
+              <td>Kategori</td>
+              <td><span class="cat-badge" style="background:#f59e0b;">Diagnos</span></td>
+            </tr>
+            <tr>
+              <td>Kod Promo</td>
+              <td><strong>SMART26B</strong></td>
+            </tr>
+            <tr>
+              <td>Didaftar</td>
+              <td>3 Jun 2026, 2:15 ptg</td>
+            </tr>
+          </table>
+        </div>
+        <p style="font-size:.72em;color:var(--muted);margin-top:4px;">Category: <strong>diagnosed</strong> (amber badge)</p>
+      </div>
+    </div>
+
+    <!-- REACTIVATION variant -->
+    <div class="state-card">
+      <div class="state-label enrolled" style="background:#f3e8ff;color:#6b21a8;">~ Reactivation variant</div>
+      <div class="state-body">
+        <div class="hpm-promo-status-block">
+          <div class="block-title">Status Promo</div>
+          <p class="hpm-enrolled">✓ Klien ini telah menerima promo.</p>
+          <table class="hpm-table">
+            <tr>
+              <td>Kategori</td>
+              <td><span class="cat-badge" style="background:#8b5cf6;">Reaktivasi</span></td>
+            </tr>
+            <tr>
+              <td>Kod Promo</td>
+              <td><strong>SMART26C</strong></td>
+            </tr>
+            <tr>
+              <td>Didaftar</td>
+              <td>4 Jun 2026, 9:00 pg</td>
+            </tr>
+          </table>
+        </div>
+        <p style="font-size:.72em;color:var(--muted);margin-top:4px;">Category: <strong>reactivation</strong> (purple badge)</p>
+      </div>
+    </div>
+
+    <!-- NOT ENROLLED -->
+    <div class="state-card">
+      <div class="state-label empty">— Not enrolled state</div>
+      <div class="state-body">
+        <div class="hpm-promo-status-block">
+          <div class="block-title">Status Promo</div>
+          <p class="hpm-not-enrolled">— Klien ini belum menerima promo.</p>
+        </div>
+        <p style="font-size:.72em;color:var(--muted);margin-top:4px;">No row in <code>home_promo_counted</code> for this entry_id</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>Client detail page — placement in context</h3>
+  <div class="client-page-mock">
+    <div class="page-header">
+      <span>🌐</span>
+      <span class="url">home.edu.my/pc/klien/maklumat/kky/abc123xyz/</span>
+    </div>
+    <div class="page-body">
+
+      <div class="m-ds-section">
+        <div class="section-title">Maklumat Pelajar</div>
+        <div class="section-body">
+          <div class="row"><span class="label">Nama</span><span>ANAK ALBAB</span></div>
+          <div class="row"><span class="label">IC / MyKID</span><span>181005140711</span></div>
+        </div>
+      </div>
+
+      <div class="m-ds-section">
+        <div class="section-title">Maklumat Penjaga</div>
+        <div class="section-body">
+          <div class="row"><span class="label">Nama Penjaga</span><span>ALBAB BIN IBRAHIM</span></div>
+        </div>
+      </div>
+
+      <div class="m-ds-section">
+        <div class="section-title">Maklumat Kelas</div>
+        <div class="section-body">
+          <div class="row"><span class="label">Tarikh Daftar</span><span>18/07/2025</span></div>
+          <div class="row"><span class="label">Pakej Kelas</span><span>Pakej A+ – PRO+</span></div>
+
+          <!-- existing Formidable field 3320 display -->
+          <div class="row" style="margin-top:2px;">
+            <span class="label" style="color:var(--muted);font-style:italic;">Promosi:</span>
+            <span style="color:var(--muted);font-style:italic;">SMART26A &nbsp;<small>(existing [if 3320] block)</small></span>
+          </div>
+
+          <!-- ← OUR SHORTCODE INJECTS HERE -->
+          <div style="border-left:3px solid var(--amber);padding-left:10px;margin:10px 0 4px;">
+            <div style="font-size:.7em;color:var(--amber);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">
+              ← [hpm_promo_status entry_id="[id]"] injects here
+            </div>
+            <div class="hpm-promo-status-block" style="margin:0;">
+              <div class="block-title">Status Promo</div>
+              <p class="hpm-enrolled">✓ Klien ini telah menerima promo.</p>
+              <table class="hpm-table">
+                <tr><td>Kategori</td><td><span class="cat-badge" style="background:#3b82f6;">Baru</span></td></tr>
+                <tr><td>Kod Promo</td><td><strong>SMART26A</strong></td></tr>
+                <tr><td>Didaftar</td><td>1 Jun 2026, 10:30 pg</td></tr>
+              </table>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:8px;"><span class="label">Nama MT</span><span>MT Gilgamesh</span></div>
+          <div class="row"><span class="label">Status</span><span>Aktif</span></div>
+        </div>
+      </div>
+
+      <div class="m-ds-section">
+        <div class="section-title">Menu Klien</div>
+        <div class="section-body">
+          <button style="background:#1e293b;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-size:.85em;cursor:pointer;">
+            Kemaskini Maklumat &amp; Status
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     TAB 3 — COUNTDOWN PAGE (6CURE theme) — A/B compare
+════════════════════════════════════════════ -->
+<div id="tab-countdown" class="tab-panel">
+  <h2>Countdown Page — <code>template/promo-page.php</code></h2>
+
+  <!-- A/B sub-toggle -->
+  <div style="display:flex;gap:8px;margin-bottom:28px;align-items:center;">
+    <span style="font-size:.82em;color:var(--muted);font-weight:600;">Magnifier treatment:</span>
+    <button id="btn-opta" onclick="showOption('a')"
+      style="background:var(--pink);color:#fff;border:none;padding:7px 18px;border-radius:20px;font-size:.82em;font-weight:700;cursor:pointer;">
+      Option A — Live inside lens
+    </button>
+    <button id="btn-optb" onclick="showOption('b')"
+      style="background:#e2e8f0;color:var(--navy);border:none;padding:7px 18px;border-radius:20px;font-size:.82em;font-weight:700;cursor:pointer;">
+      Option B — Magnifier as-is
+    </button>
+  </div>
+
+  <!-- ── OPTION A: live slot count overlaid inside lens ── -->
+  <div id="opt-a">
+    <p style="font-size:.8em;color:var(--muted);margin-bottom:16px;">
+      <strong>Option A</strong> — A white overlay covers the static lens text. Live slot count + progress bar appear inside the magnifier's lens zone.
+    </p>
+    <div class="cp-wrap">
+      <div class="cp-inner">
+        <div class="cp-logo"><img src="../Poster%20Kempen%20Promo%20Promosi/title.png" alt="The 6CURE Deals"></div>
+        <div class="cp-tagline-txt">Discover the HOME 6 Principles</div>
+
+        <div class="cp-mid-row">
+          <!-- Steps -->
+          <div class="cp-steps">
+            <div class="cp-step">
+              <span class="cp-step-num">①</span>
+              <span>Comment One of the HOME 6 Principles</span>
+            </div>
+            <div class="cp-step">
+              <span class="cp-step-num">②</span>
+              <span>Redeem <strong>RM33 OFF</strong></span>
+            </div>
+          </div>
+          <!-- Magnifier with live overlay inside lens -->
+          <div class="cp-mag-wrap">
+            <img src="../Poster%20Kempen%20Promo%20Promosi/magnifiying.png" alt="magnifier" class="cp-mag-img">
+            <!-- Overlay sits over the lens area (top-left of the image, ~55% from top, ~35% from left) -->
+            <div class="cp-lens-overlay">
+              <div class="cp-lens-count"><strong id="lens-used">220</strong><span>/330</span></div>
+              <div class="cp-lens-bar-wrap"><div class="cp-lens-bar" id="lens-bar"></div></div>
+              <div class="cp-lens-label">pendaftaran</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cp-pricing-inline">
+          Harga biasa <s>RM200</s> &nbsp;→&nbsp; Harga promo <strong style="color:var(--pink);">RM167</strong>
+        </div>
+
+        <div class="cp-countdown">
+          <div class="cp-tile"><div class="digits" id="a-days">02</div><div class="unit">Hari</div></div>
+          <div class="cp-sep">:</div>
+          <div class="cp-tile"><div class="digits" id="a-hours">14</div><div class="unit">Jam</div></div>
+          <div class="cp-sep">:</div>
+          <div class="cp-tile"><div class="digits" id="a-mins">37</div><div class="unit">Min</div></div>
+          <div class="cp-sep">:</div>
+          <div class="cp-tile"><div class="digits" id="a-secs">09</div><div class="unit">Saat</div></div>
+        </div>
+
+        <div class="cp-cta">Hubungi outlet anda untuk mendapatkan kod promo.</div>
+        <div class="cp-footer">
+          <span>📘 📷 🎵 homemathstherapy</span>
+          <span>🌐 www.home.edu.my</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── OPTION B: magnifier as-is, slot bar separate row ── -->
+  <div id="opt-b" style="display:none;">
+    <p style="font-size:.8em;color:var(--muted);margin-bottom:16px;">
+      <strong>Option B</strong> — Magnifier image is untouched (RM33 + 330 text stay visible). Slot progress is a separate row below the magnifier.
+    </p>
+    <div class="cp-wrap">
+      <div class="cp-inner">
+        <div class="cp-logo"><img src="../Poster%20Kempen%20Promo%20Promosi/title.png" alt="The 6CURE Deals"></div>
+        <div class="cp-tagline-txt">Discover the HOME 6 Principles</div>
+
+        <div class="cp-mid-row">
+          <!-- Steps -->
+          <div class="cp-steps">
+            <div class="cp-step">
+              <span class="cp-step-num">①</span>
+              <span>Comment One of the HOME 6 Principles</span>
+            </div>
+            <div class="cp-step">
+              <span class="cp-step-num">②</span>
+              <span>Redeem <strong>RM33 OFF</strong></span>
+            </div>
+          </div>
+          <!-- Magnifier untouched -->
+          <div class="cp-mag-wrap" style="position:static;">
+            <img src="../Poster%20Kempen%20Promo%20Promosi/magnifiying.png" alt="magnifier" class="cp-mag-img" style="position:static;width:100%;max-width:200px;">
+          </div>
+        </div>
+
+        <!-- Slot bar as its own row -->
+        <div class="cp-slot-row">
+          <div class="cp-slot-bar-wrap"><div class="cp-slot-bar-fill" id="b-bar"></div></div>
+          <div class="cp-slot-label"><strong>220</strong> / 330 pendaftaran telah digunakan</div>
+        </div>
+
+        <div class="cp-pricing-inline">
+          Harga biasa <s>RM200</s> &nbsp;→&nbsp; Harga promo <strong style="color:var(--pink);">RM167</strong>
+        </div>
+
+        <div class="cp-countdown">
+          <div class="cp-tile"><div class="digits" id="b-days">02</div><div class="unit">Hari</div></div>
+          <div class="cp-sep">:</div>
+          <div class="cp-tile"><div class="digits" id="b-hours">14</div><div class="unit">Jam</div></div>
+          <div class="cp-sep">:</div>
+          <div class="cp-tile"><div class="digits" id="b-mins">37</div><div class="unit">Min</div></div>
+          <div class="cp-sep">:</div>
+          <div class="cp-tile"><div class="digits" id="b-secs">09</div><div class="unit">Saat</div></div>
+        </div>
+
+        <div class="cp-cta">Hubungi outlet anda untuk mendapatkan kod promo.</div>
+        <div class="cp-footer">
+          <span>📘 📷 🎵 homemathstherapy</span>
+          <span>🌐 www.home.edu.my</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<style>
+  /* Shared poster-page wrapper */
+  .cp-wrap {
+    background: linear-gradient(160deg, #c8ecf8 0%, #e8f6fd 60%, #b8e5f5 100%);
+    border-radius: 20px; overflow: hidden;
+    box-shadow: 0 8px 40px rgba(13,43,110,.18);
+    max-width: 620px; margin: 0 auto;
+    position: relative;
+  }
+  .cp-wrap::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(circle at 10% 15%, rgba(240,45,125,.06) 0%, transparent 50%),
+      radial-gradient(circle at 85% 80%, rgba(92,191,42,.06) 0%, transparent 50%);
+  }
+  /* Math symbols */
+  .cp-wrap::after {
+    content: 'a+b=c²   3×3=9   √36   ∑';
+    position: absolute; top: 18px; right: 18px;
+    font-size: .72em; color: rgba(13,43,110,.15);
+    font-style: italic; letter-spacing: .15em; pointer-events: none;
+    white-space: nowrap;
+  }
+
+  .cp-inner { padding: 28px 28px 32px; text-align: center; position: relative; }
+
+  .cp-logo img { height: 72px; margin-bottom: 2px; }
+
+  .cp-tagline-txt {
+    font-size: .92em; color: var(--navy); font-weight: 700;
+    opacity: .7; margin-bottom: 20px;
+  }
+
+  /* Mid row: steps left, magnifier right */
+  .cp-mid-row {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 16px; text-align: left;
+  }
+
+  .cp-steps { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+  .cp-step {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: .88em; color: var(--navy); font-weight: 600; line-height: 1.4;
+  }
+  .cp-step-num {
+    background: var(--pink); color: #fff;
+    border-radius: 50%; width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .78em; font-weight: 900; flex-shrink: 0;
+  }
+
+  /* Magnifier container */
+  .cp-mag-wrap {
+    flex-shrink: 0; width: 180px; position: relative;
+  }
+  .cp-mag-img {
+    width: 100%; display: block;
+    filter: drop-shadow(0 4px 10px rgba(13,43,110,.2));
+  }
+
+  /* Option A — lens overlay */
+  .cp-lens-overlay {
+    position: absolute;
+    /* Lens center is approx 38% from left, 38% from top of the 7.png image */
+    top: 22%; left: 8%;
+    width: 72%; height: 52%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(255,255,255,.92);
+    border-radius: 50%;
+  }
+  .cp-lens-count {
+    font-size: 1.1em; font-weight: 900; color: var(--pink);
+    line-height: 1;
+  }
+  .cp-lens-count span { font-size: .7em; color: var(--navy); opacity: .6; font-weight: 600; }
+  .cp-lens-bar-wrap {
+    background: rgba(13,43,110,.1); border-radius: 100px;
+    height: 6px; width: 70%; overflow: hidden; margin: 4px 0;
+  }
+  .cp-lens-bar {
+    height: 100%; border-radius: 100px; width: 0%;
+    background: linear-gradient(90deg, var(--lime-dark), var(--lime));
+    transition: width .8s cubic-bezier(.34,1.56,.64,1);
+  }
+  .cp-lens-label { font-size: .6em; color: var(--navy); opacity: .55; font-weight: 600; }
+
+  /* Option B — slot row */
+  .cp-slot-row { margin-bottom: 14px; }
+  .cp-slot-bar-wrap {
+    background: rgba(13,43,110,.1); border-radius: 100px;
+    height: 10px; overflow: hidden; margin-bottom: 6px;
+  }
+  .cp-slot-bar-fill {
+    height: 100%; border-radius: 100px; width: 0%;
+    background: linear-gradient(90deg, var(--lime-dark), var(--lime));
+    transition: width .8s cubic-bezier(.34,1.56,.64,1);
+  }
+  .cp-slot-label { font-size: .82em; color: var(--navy); opacity: .65; }
+  .cp-slot-label strong { color: var(--lime-dark); }
+
+  /* Shared: pricing inline */
+  .cp-pricing-inline {
+    font-size: .86em; color: var(--navy); opacity: .7;
+    margin-bottom: 16px;
+  }
+
+  /* Shared: countdown */
+  .cp-countdown {
+    display: flex; justify-content: center; gap: 8px;
+    margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .cp-tile {
+    background: #fff; border-radius: 10px;
+    padding: 10px 14px; min-width: 60px;
+    box-shadow: 0 2px 8px rgba(13,43,110,.1);
+  }
+  .cp-tile .digits {
+    font-size: 2em; font-weight: 900; color: var(--pink);
+    line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .cp-tile .unit {
+    font-size: .56em; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--navy); opacity: .45; margin-top: 3px;
+  }
+  .cp-sep {
+    font-size: 1.8em; color: var(--pink); opacity: .4;
+    align-self: center; padding-bottom: 18px; line-height: 1;
+  }
+
+  /* CTA + footer */
+  .cp-cta { font-size: .84em; color: var(--navy); opacity: .55; margin-bottom: 14px; }
+  .cp-footer {
+    display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;
+    font-size: .75em; color: var(--navy); opacity: .45;
+  }
+</style>
+
+<script>
+  function showTab(id) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + id).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  function showOption(opt) {
+    document.getElementById('opt-a').style.display = opt === 'a' ? 'block' : 'none';
+    document.getElementById('opt-b').style.display = opt === 'b' ? 'block' : 'none';
+    document.getElementById('btn-opta').style.background = opt === 'a' ? 'var(--pink)' : '#e2e8f0';
+    document.getElementById('btn-opta').style.color = opt === 'a' ? '#fff' : 'var(--navy)';
+    document.getElementById('btn-optb').style.background = opt === 'b' ? 'var(--pink)' : '#e2e8f0';
+    document.getElementById('btn-optb').style.color = opt === 'b' ? '#fff' : 'var(--navy)';
+    if (opt === 'b') {
+      setTimeout(function(){ document.getElementById('b-bar').style.width = '66.7%'; }, 100);
+    }
+  }
+
+  // Live countdown — ends 12 Jun 2026 23:59 MYT (UTC+8)
+  var endTime = Date.now() + ((2*86400 + 14*3600 + 37*60 + 9) * 1000);
+
+  function pad(n) { return String(n).padStart(2,'0'); }
+
+  function tick() {
+    var diff = Math.max(0, endTime - Date.now());
+    var days  = Math.floor(diff / 86400000);
+    var hours = Math.floor((diff % 86400000) / 3600000);
+    var mins  = Math.floor((diff % 3600000) / 60000);
+    var secs  = Math.floor((diff % 60000) / 1000);
+    ['a','b'].forEach(function(x) {
+      var el = function(id) { return document.getElementById(x+'-'+id); };
+      if (el('days'))  el('days').textContent  = pad(days);
+      if (el('hours')) el('hours').textContent = pad(hours);
+      if (el('mins'))  el('mins').textContent  = pad(mins);
+      if (el('secs'))  el('secs').textContent  = pad(secs);
+    });
+  }
+  tick(); setInterval(tick, 1000);
+
+  // Animate Option A lens bar on load
+  setTimeout(function(){
+    var lb = document.getElementById('lens-bar');
+    if (lb) lb.style.width = '66.7%';
+  }, 500);
+</script>
+</body>
+</html>

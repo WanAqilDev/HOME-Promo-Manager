@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>6CURE Deals — Countdown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="icon" type="image/png" href="../Poster%20Kempen%20Promo%20Promosi/logo_home.png">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --pink:      #f02d7d;
+  --pink-light:#ff6faa;
+  --pink-dark: #b5115a;
+  --lime:      #5cbf2a;
+  --lime-dark: #3d9a18;
+  --orange:    #f5821f;
+  --navy:      #0d2b6e;
+}
+
+/* ─── BASE ──────────────────────────────── */
+html, body {
+  min-height: 100%;
+  font-family: 'Nunito', sans-serif;
+  background: linear-gradient(180deg, #c2e8f8 0%, #d9f0fb 55%, #b0ddf0 100%);
+  background-attachment: fixed;
+}
+
+/* ─── BACKGROUND DECO ───────────────────── */
+.bg-deco { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+
+.cloud {
+  position: absolute;
+  background: rgba(255,255,255,.72);
+  border-radius: 50px;
+  filter: blur(1px);
+}
+.cloud::before, .cloud::after {
+  content: ''; position: absolute;
+  background: rgba(255,255,255,.72); border-radius: 50%;
+}
+.c1 { width: 140px; height: 42px; top: 5%;  left: -14px; }
+.c1::before { width: 68px; height: 68px; top: -32px; left: 20px; }
+.c1::after  { width: 50px; height: 50px; top: -22px; left: 60px; }
+
+.c2 { width: 100px; height: 30px; top: 10%; right: 4%; }
+.c2::before { width: 50px; height: 50px; top: -24px; left: 14px; }
+.c2::after  { width: 36px; height: 36px; top: -15px; left: 46px; }
+
+.c3 { width: 160px; height: 48px; top: 38%; left: -22px; }
+.c3::before { width: 80px; height: 80px; top: -38px; left: 22px; }
+.c3::after  { width: 58px; height: 58px; top: -26px; left: 72px; }
+
+.c4 { width: 90px; height: 26px; top: 62%; right: -10px; }
+.c4::before { width: 46px; height: 46px; top: -22px; left: 12px; }
+.c4::after  { width: 32px; height: 32px; top: -14px; left: 40px; }
+
+.c5 { width: 120px; height: 36px; bottom: 18%; left: 8%; }
+.c5::before { width: 60px; height: 60px; top: -28px; left: 18px; }
+.c5::after  { width: 44px; height: 44px; top: -18px; left: 56px; }
+
+.math {
+  position: absolute;
+  font-family: 'Fredoka One', cursive;
+  color: rgba(13,43,110,.1);
+  pointer-events: none; user-select: none;
+}
+.m1 { font-size: 1.8em; top: 7%;  left: 5%;   transform: rotate(-12deg); animation: floatY 6s ease-in-out infinite; }
+.m2 { font-size: 1.2em; top: 16%; right: 7%;  transform: rotate(8deg);  animation: floatY 7s ease-in-out infinite 1s; }
+.m3 { font-size: 2em;   top: 40%; left: 2%;   transform: rotate(-6deg); animation: floatY 8s ease-in-out infinite .5s; }
+.m4 { font-size: 1.3em; top: 55%; right: 4%;  transform: rotate(14deg); animation: floatY 5s ease-in-out infinite 2s; }
+.m5 { font-size: 1.6em; top: 72%; left: 7%;   transform: rotate(-10deg);animation: floatY 7s ease-in-out infinite 1.5s; }
+.m6 { font-size: 1.1em; bottom:10%; right: 9%; transform: rotate(5deg); animation: floatY 6s ease-in-out infinite .8s; }
+
+@keyframes floatY {
+  0%, 100% { transform: translateY(0) rotate(var(--r, -6deg)); }
+  50%       { transform: translateY(-10px) rotate(var(--r, -6deg)); }
+}
+
+/* ─── PAGE GRID ─────────────────────────── */
+.page {
+  position: relative; z-index: 1;
+  min-height: 100vh;
+  display: grid;
+  /* mobile: two cols — steps share row with magnifier */
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto;
+  grid-template-areas:
+    "header  header"
+    "hero    hero"
+    "steps   mag"
+    "pill    pill"
+    "cdown   cdown"
+    "cta     cta"
+    "footer  footer";
+  padding: 0 16px 48px;
+  gap: 0;
+  align-items: start;
+}
+
+.page-header     { grid-area: header; }
+.hero            { grid-area: hero; }
+.steps-section   { grid-area: steps; }
+.mag-zone        { grid-area: mag; }
+.slot-pill       { grid-area: pill; }
+.countdown-section{ grid-area: cdown; }
+.pricing-strip   { grid-area: pricing; }
+.cta             { grid-area: cta; }
+.page-footer     { grid-area: footer; }
+
+/* ─── DESKTOP GRID ──────────────────────── */
+@media (min-width: 768px) {
+  .page {
+    grid-template-columns: 1fr 380px;
+    grid-template-areas:
+      "header  header"
+      "hero    mag"
+      "steps   mag"
+      "pill    mag"
+      "cdown   mag"
+      "cta     mag"
+      "footer  mag";
+    padding: 0 60px 60px;
+    column-gap: 48px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .mag-zone {
+    align-self: center;
+    padding-top: 0;
+    margin-top: 0;
+  }
+}
+
+@media (min-width: 1200px) {
+  .page {
+    grid-template-columns: 1fr 460px;
+    column-gap: 64px;
+    padding: 0 80px 80px;
+  }
+}
+
+/* ─── HEADER ────────────────────────────── */
+.page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 0 0;
+  position: relative; z-index: 10;
+}
+.home-brand img {
+  height: 60px;
+  filter: drop-shadow(0 2px 4px rgba(13,43,110,.12));
+}
+@media (min-width: 768px) {
+  .home-brand img { height: 80px; }
+}
+.date-pill {
+  background: var(--navy); color: #fff;
+  font-family: 'Fredoka One', cursive;
+  font-size: .8em; letter-spacing: .05em;
+  padding: 6px 16px; border-radius: 20px;
+}
+
+/* ─── HERO ──────────────────────────────── */
+.hero {
+  padding: 14px 0 0;
+  position: relative; z-index: 10;
+}
+.hero-logo {
+  width: min(340px, 92%);
+  display: block;
+  filter: drop-shadow(0 4px 12px rgba(13,43,110,.15));
+  animation: popIn .5s cubic-bezier(.34,1.56,.64,1) both;
+}
+.hero-caption-img {
+  width: min(300px, 85%);
+  display: block;
+  margin-top: 6px;
+  filter: drop-shadow(0 2px 6px rgba(13,43,110,.1));
+  animation: popIn .5s cubic-bezier(.34,1.56,.64,1) .1s both;
+}
+
+@media (min-width: 768px) {
+  .hero { padding: 28px 0 0; }
+  .hero-logo { width: min(480px, 96%); }
+  .hero-caption-img { width: min(420px, 94%); margin-top: 8px; }
+}
+
+@keyframes popIn {
+  from { transform: scale(.85); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+/* ─── STEPS ─────────────────────────────── */
+.steps-section {
+  padding-top: 14px;
+  position: relative; z-index: 10;
+  display: flex; flex-direction: column; gap: 8px;
+  /* on mobile, steps are in the left of the steps/mag row */
+  padding-right: 10px;
+}
+.step {
+  border-radius: 16px; padding: 11px 13px;
+  display: flex; align-items: center; gap: 10px;
+  animation: slideIn .4s ease both;
+}
+.step.s1 {
+  background: var(--pink);
+  box-shadow: 0 4px 14px rgba(240,45,125,.35);
+}
+.step.s2 {
+  background: var(--lime);
+  box-shadow: 0 4px 14px rgba(92,191,42,.35);
+  animation-delay: .08s;
+}
+@keyframes slideIn {
+  from { transform: translateX(-12px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+.step-num {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.6em; color: rgba(255,255,255,.28);
+  line-height: 1; flex-shrink: 0; width: 22px; text-align: center;
+}
+/* step-icon removed */
+.step-text { font-size: .82em; color: #fff; font-weight: 800; line-height: 1.35; }
+.step-text em { font-style: normal; color: rgba(255,255,255,.72); font-weight: 700; }
+
+@media (min-width: 768px) {
+  .steps-section { padding-top: 20px; padding-right: 0; gap: 12px; }
+  .step { padding: 14px 18px; gap: 14px; }
+  .step-text { font-size: .92em; }
+  .step-num { font-size: 2.2em; width: 32px; }
+}
+
+/* ─── MAGNIFIER ─────────────────────────── */
+.mag-zone {
+  position: relative; z-index: 10;
+  padding-top: 14px;
+  animation: floatMag 4s ease-in-out infinite;
+}
+.mag-img {
+  width: 170px; display: block;
+  filter: drop-shadow(0 6px 20px rgba(13,43,110,.2));
+}
+
+@media (min-width: 768px) {
+  .mag-zone { padding-top: 0; }
+  .mag-img { width: 100%; max-width: 380px; }
+}
+@media (min-width: 1200px) {
+  .mag-img { max-width: 440px; }
+}
+
+@keyframes floatMag {
+  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+  50%       { transform: translateY(-10px) rotate(1deg); }
+}
+
+/* ─── SLOT PILL ──────────────────────────── */
+.slot-pill {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: #fff;
+  border-radius: 100px;
+  padding: 7px 18px 7px 7px;
+  box-shadow: 0 4px 18px rgba(13,43,110,.14);
+  margin-top: 12px;
+  align-self: center;
+  justify-self: center;   /* centre on mobile (full-width grid cell) */
+  animation: popIn .4s cubic-bezier(.34,1.56,.64,1) .2s both;
+  position: relative; z-index: 10;
+}
+
+@media (min-width: 768px) {
+  .slot-pill { justify-self: center; }
+}
+.sp-icon {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--pink);
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(240,45,125,.3);
+  position: relative;
+}
+/* CSS exclamation mark instead of emoji */
+.sp-icon::before {
+  content: '!';
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.1em; color: #fff;
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.sp-big {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.15em; color: var(--pink); line-height: 1; display: block;
+}
+.sp-sub {
+  font-size: .66em; color: var(--navy); opacity: .5;
+  font-weight: 800; display: block; margin-top: 1px;
+}
+
+@media (min-width: 768px) {
+  .slot-pill { margin-top: 20px; padding: 8px 22px 8px 8px; }
+  .sp-icon { width: 42px; height: 42px; font-size: 1.1em; }
+  .sp-big { font-size: 1.3em; }
+  .sp-sub { font-size: .72em; }
+}
+
+/* ─── COUNTDOWN ──────────────────────────── */
+.countdown-section {
+  padding-top: 16px;
+  position: relative; z-index: 10;
+}
+.countdown-label {
+  font-family: 'Fredoka One', cursive;
+  font-size: .78em; color: var(--navy); opacity: .45;
+  letter-spacing: .14em; text-transform: uppercase;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.countdown {
+  display: flex; align-items: flex-start; gap: 6px; flex-wrap: wrap;
+  justify-content: center;
+}
+.cd-tile {
+  background: #fff; border-radius: 14px;
+  padding: 11px 12px 8px; min-width: 62px; text-align: center;
+  box-shadow: 0 4px 16px rgba(13,43,110,.12), 0 0 0 2px rgba(240,45,125,.1);
+  position: relative; overflow: hidden;
+}
+.cd-tile::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,.5) 0%, transparent 55%);
+  pointer-events: none;
+}
+.cd-digits {
+  font-family: 'Fredoka One', cursive;
+  font-size: 2.2em; color: var(--pink); line-height: 1;
+  font-variant-numeric: tabular-nums; display: block;
+}
+.cd-digits.bump { animation: bump .25s ease; }
+@keyframes bump {
+  0%  { transform: scale(1.15); }
+  100%{ transform: scale(1); }
+}
+.cd-unit {
+  font-family: 'Fredoka One', cursive;
+  font-size: .54em; color: var(--navy); opacity: .42;
+  text-transform: uppercase; letter-spacing: .1em;
+  margin-top: 2px; display: block;
+}
+.cd-sep {
+  font-family: 'Fredoka One', cursive;
+  font-size: 2em; color: var(--pink); opacity: .38;
+  align-self: center; padding-bottom: 22px; line-height: 1;
+}
+
+@media (min-width: 768px) {
+  .countdown-section { padding-top: 24px; }
+  .cd-tile { padding: 14px 18px 10px; min-width: 80px; border-radius: 18px; }
+  .cd-digits { font-size: 3em; }
+  .cd-unit { font-size: .6em; margin-top: 4px; }
+  .cd-sep { font-size: 2.6em; padding-bottom: 30px; }
+  .countdown { gap: 8px; }
+}
+
+/* pricing strip removed — not shown on poster */
+
+/* ─── CTA ───────────────────────────────── */
+.cta {
+  margin-top: 16px;
+  font-size: .88em; color: var(--navy); opacity: .58;
+  font-weight: 700; line-height: 1.6;
+  position: relative; z-index: 10;
+  text-align: center;
+}
+.cta strong { color: var(--pink); opacity: 1; }
+
+@media (min-width: 768px) {
+  .cta { margin-top: 20px; font-size: 1em; text-align: left; }
+}
+
+/* ─── FOOTER ───────────────────────────── */
+
+/* ─── FOOTER ────────────────────────────── */
+.page-footer {
+  margin-top: 20px;
+  display: flex; gap: 20px; flex-wrap: wrap;
+  font-size: .76em; color: var(--navy); opacity: .4; font-weight: 700;
+  position: relative; z-index: 10;
+}
+
+@media (min-width: 768px) {
+  .page-footer { margin-top: 28px; font-size: .84em; gap: 28px; }
+}
+
+/* ─── CORNER DECORATIONS ────────────────── */
+.corner-wrap {
+  position: fixed; inset: 0; pointer-events: none; z-index: 8; overflow: hidden;
+}
+.corner-green {
+  position: absolute;
+  bottom: -100px; right: -80px;
+  width: 340px; height: 340px;
+  background: radial-gradient(circle at 40% 40%, var(--lime), var(--lime-dark));
+  border-radius: 50%;
+  box-shadow: inset -8px -8px 20px rgba(0,0,0,.1);
+}
+.corner-green-2 {
+  position: absolute;
+  bottom: -40px; right: 120px;
+  width: 180px; height: 180px;
+  background: var(--lime);
+  border-radius: 50%;
+  opacity: .75;
+}
+.corner-blue {
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, #90d8f4, #5bbde0);
+  border-radius: 50%;
+  opacity: .55;
+}
+/* Pink — top-left */
+.corner-pink {
+  position: absolute;
+  top: -70px; left: -70px;
+  width: 220px; height: 220px;
+  background: radial-gradient(circle at 55% 55%, var(--pink), var(--pink-dark));
+  border-radius: 50%;
+  opacity: .5;
+}
+.corner-pink-2 {
+  position: absolute;
+  top: -20px; left: 100px;
+  width: 110px; height: 110px;
+  background: var(--pink);
+  border-radius: 50%;
+  opacity: .3;
+}
+/* Orange — bottom-left */
+.corner-orange {
+  position: absolute;
+  bottom: -110px; left: -80px;
+  width: 260px; height: 260px;
+  background: radial-gradient(circle at 45% 45%, #f9a94a, var(--orange));
+  border-radius: 50%;
+  opacity: .6;
+  box-shadow: inset 6px 6px 18px rgba(0,0,0,.08);
+}
+.corner-orange-2 {
+  position: absolute;
+  bottom: -50px; left: 130px;
+  width: 130px; height: 130px;
+  background: var(--orange);
+  border-radius: 50%;
+  opacity: .35;
+}
+/* Hide corners on mobile forced view */
+body.mobile-forced .corner-wrap { display: none; }
+
+/* ─── A/B VIEW TOGGLE ───────────────────── */
+.view-toggle {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  background: #0f172a;
+  display: flex; align-items: center; justify-content: center;
+  gap: 6px; padding: 8px 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.4);
+}
+.view-toggle .tg-label {
+  font-size: .72em; font-weight: 800; color: #475569;
+  text-transform: uppercase; letter-spacing: .1em;
+  margin-right: 4px; font-family: 'Nunito', sans-serif;
+}
+.tg-btn {
+  background: rgba(255,255,255,.08);
+  border: 1.5px solid rgba(255,255,255,.12);
+  color: #64748b; padding: 5px 18px; border-radius: 20px;
+  font-size: .78em; font-weight: 800; cursor: pointer;
+  font-family: 'Nunito', sans-serif;
+  transition: all .15s;
+}
+.tg-btn.active { background: var(--pink); border-color: var(--pink); color: #fff; }
+
+/* mobile forced step overrides — no icon */
+body.mobile-forced .step-num { font-size: 1.4em !important; width: 20px !important; }
+.tg-btn:hover:not(.active) { background: rgba(255,255,255,.12); color: #94a3b8; }
+
+body { padding-top: 42px; }
+
+/* ─── FORCED MOBILE OVERRIDE ────────────── */
+body.mobile-forced .page {
+  max-width: 390px !important;
+  margin: 0 auto !important;
+  grid-template-columns: 1fr 120px !important;
+  grid-template-areas:
+    "header  header"
+    "hero    hero"
+    "steps   mag"
+    "pill    pill"
+    "cdown   cdown"
+    "cta     cta"
+    "footer  footer" !important;
+  padding: 0 16px 48px !important;
+  column-gap: 0 !important;
+}
+body.mobile-forced .mag-zone   { padding-top: 14px !important; }
+body.mobile-forced .mag-img    { width: 110px !important; max-width: 110px !important; }
+body.mobile-forced .hero-logo  { width: min(280px, 80%) !important; }
+body.mobile-forced .hero-caption-img { width: min(300px, 85%) !important; }
+body.mobile-forced .steps-section { padding-right: 10px !important; }
+body.mobile-forced .step       { padding: 11px 11px !important; gap: 8px !important; }
+body.mobile-forced .step-text  { font-size: .78em !important; }
+body.mobile-forced .step-ghost-num { font-size: 1.6em !important; width: 22px !important; }
+body.mobile-forced .step-icon  { font-size: 1.2em !important; }
+body.mobile-forced .cd-tile    { padding: 11px 10px 8px !important; min-width: 58px !important; border-radius: 13px !important; }
+body.mobile-forced .cd-digits  { font-size: 2.1em !important; }
+body.mobile-forced .cd-unit    { font-size: .52em !important; }
+body.mobile-forced .cd-sep     { font-size: 1.9em !important; padding-bottom: 20px !important; }
+body.mobile-forced .countdown  { gap: 4px !important; flex-wrap: nowrap !important; }
+body.mobile-forced .cta        { font-size: .86em !important; }
+body.mobile-forced .page-footer{ font-size: .74em !important; gap: 16px !important; }
+body.mobile-forced .slot-pill  { padding: 6px 14px 6px 6px !important; justify-self: center !important; }
+body.mobile-forced .sp-icon    { width: 34px !important; height: 34px !important; }
+body.mobile-forced .sp-big     { font-size: 1.1em !important; }
+body.mobile-forced .sp-sub     { font-size: .64em !important; }
+body.mobile-forced .countdown-section { padding-top: 14px !important; }
+body.mobile-forced .cd-tile    { min-width: 52px !important; padding: 8px 6px 6px !important; }
+body.mobile-forced .cd-digits  { font-size: 1.9em !important; }
+body.mobile-forced .cd-sep     { font-size: 1.8em !important; padding-bottom: 18px !important; }
+body.mobile-forced .corner-green    { width: 190px !important; height: 190px !important; bottom: -55px !important; right: -44px !important; }
+body.mobile-forced .corner-green-2  { width: 100px !important; height: 100px !important; bottom: -22px !important; right: 66px !important; }
+body.mobile-forced .corner-blue     { width: 110px !important; height: 110px !important; top: -33px !important; right: -33px !important; }
+body.mobile-forced .corner-pink     { width: 120px !important; height: 120px !important; top: -38px !important; left: -38px !important; }
+body.mobile-forced .corner-pink-2   { width: 60px !important;  height: 60px !important;  top: -11px !important; left: 55px !important; }
+body.mobile-forced .corner-orange   { width: 145px !important; height: 145px !important; bottom: -60px !important; left: -44px !important; }
+body.mobile-forced .corner-orange-2 { width: 72px !important;  height: 72px !important;  bottom: -28px !important; left: 72px !important; }
+body.mobile-forced .hero       { padding: 14px 0 0 !important; }
+</style>
+</head>
+<body>
+
+<!-- A/B View Toggle -->
+<div class="view-toggle">
+  <span class="tg-label">View:</span>
+  <button class="tg-btn active" id="btn-desktop" onclick="setView('desktop')">Desktop</button>
+  <button class="tg-btn" id="btn-mobile" onclick="setView('mobile')">Mobile</button>
+</div>
+
+<!-- Corner decorations — mask magnifier handle cutoff -->
+<div class="corner-wrap">
+  <div class="corner-pink"></div>
+  <div class="corner-pink-2"></div>
+  <div class="corner-blue"></div>
+  <div class="corner-orange"></div>
+  <div class="corner-orange-2"></div>
+  <div class="corner-green"></div>
+  <div class="corner-green-2"></div>
+</div>
+
+<!-- Fixed background decorations -->
+<div class="bg-deco">
+  <div class="cloud c1"></div>
+  <div class="cloud c2"></div>
+  <div class="cloud c3"></div>
+  <div class="cloud c4"></div>
+  <div class="cloud c5"></div>
+  <span class="math m1">a+b=c²</span>
+  <span class="math m2">3×3=9</span>
+  <span class="math m3">√36</span>
+  <span class="math m4">∑n</span>
+  <span class="math m5">x²+y²</span>
+  <span class="math m6">π≈3.14</span>
+</div>
+
+<div class="page">
+
+  <!-- Header -->
+  <header class="page-header">
+    <div class="home-brand">
+      <img src="../Poster%20Kempen%20Promo%20Promosi/logo_home.png" alt="HOME">
+    </div>
+    <div class="date-pill">6 – 12 JUN 2026</div>
+  </header>
+
+  <!-- Hero -->
+  <div class="hero">
+    <img class="hero-logo" src="../Poster%20Kempen%20Promo%20Promosi/title.png" alt="The 6CURE Deals">
+    <img class="hero-caption-img" src="../Poster%20Kempen%20Promo%20Promosi/captions.png" alt="Discover the HOME 6 Principles">
+  </div>
+
+  <!-- Steps -->
+  <div class="steps-section">
+    <div class="step s1">
+      <div class="step-num">1</div>
+      <div class="step-text">Like and Comment one of the <em>HOME 6 Principles</em></div>
+    </div>
+    <div class="step s2">
+      <div class="step-num">2</div>
+      <div class="step-text">Redeem <em>RM33 OFF</em> your registration</div>
+    </div>
+  </div>
+
+  <!-- Magnifier -->
+  <div class="mag-zone">
+    <img class="mag-img" src="../Poster%20Kempen%20Promo%20Promosi/magnifiying.png" alt="RM33 OFF">
+  </div>
+
+  <!-- Slot pill -->
+  <div class="slot-pill">
+    <div class="sp-icon"></div>
+    <div>
+      <span class="sp-big" id="slots-remaining">110 slot lagi!</span>
+      <span class="sp-sub" id="slots-used">220 / 330 digunakan</span>
+    </div>
+  </div>
+
+  <!-- Countdown -->
+  <div class="countdown-section">
+    <div class="countdown-label">Tamat dalam</div>
+    <div class="countdown">
+      <div class="cd-tile"><span class="cd-digits" id="cd-days">02</span><span class="cd-unit">Hari</span></div>
+      <div class="cd-sep">:</div>
+      <div class="cd-tile"><span class="cd-digits" id="cd-hours">14</span><span class="cd-unit">Jam</span></div>
+      <div class="cd-sep">:</div>
+      <div class="cd-tile"><span class="cd-digits" id="cd-mins">37</span><span class="cd-unit">Min</span></div>
+      <div class="cd-sep">:</div>
+      <div class="cd-tile"><span class="cd-digits" id="cd-secs">09</span><span class="cd-unit">Saat</span></div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta">
+    Hubungi outlet anda untuk mendapatkan <strong>kod promo</strong>.
+  </div>
+
+  <!-- Footer -->
+  <footer class="page-footer">
+    <span>homemathstherapy</span>
+    <span>www.home.edu.my</span>
+  </footer>
+
+</div>
+
+<script>
+  var endTime = Date.now() + ((2*86400 + 14*3600 + 37*60 + 9) * 1000);
+  var prev = {};
+  function pad(n) { return String(n).padStart(2,'0'); }
+  function tick() {
+    var diff = Math.max(0, endTime - Date.now());
+    var v = {
+      days:  Math.floor(diff / 86400000),
+      hours: Math.floor((diff % 86400000) / 3600000),
+      mins:  Math.floor((diff % 3600000) / 60000),
+      secs:  Math.floor((diff % 60000) / 1000)
+    };
+    ['days','hours','mins','secs'].forEach(function(k) {
+      var el = document.getElementById('cd-' + k);
+      var val = pad(v[k]);
+      if (val !== prev[k]) {
+        el.textContent = val;
+        el.classList.remove('bump');
+        void el.offsetWidth;
+        el.classList.add('bump');
+        prev[k] = val;
+      }
+    });
+  }
+  tick(); setInterval(tick, 1000);
+
+  // A/B toggle
+  function setView(v) {
+    document.body.classList.toggle('mobile-forced', v === 'mobile');
+    document.getElementById('btn-desktop').classList.toggle('active', v === 'desktop');
+    document.getElementById('btn-mobile').classList.toggle('active', v === 'mobile');
+  }
+
+  // Slot pill
+  var used = 220, max = 330;
+  document.getElementById('slots-remaining').textContent = (max - used) + ' slot lagi!';
+  document.getElementById('slots-used').textContent = used + ' / ' + max + ' digunakan';
+</script>
+</body>
+</html>
