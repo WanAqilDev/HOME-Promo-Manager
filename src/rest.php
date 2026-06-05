@@ -11,6 +11,14 @@ add_action('rest_api_init', function () {
         'permission_callback' => '__return_true',
     ]);
 
+    // Public per-entry enrollment status (one-time just_enrolled flag)
+    register_rest_route('promo/v1', '/status/(?P<entry_id>\d+)', [
+        'methods'             => 'GET',
+        'callback'            => 'HPM\rest_entry_status',
+        'permission_callback' => '__return_true',
+        'args'                => ['entry_id' => ['validate_callback' => 'is_numeric']],
+    ]);
+
     // Admin-only campaign CRUD
     $admin_perm = fn() => current_user_can(CampaignEngine::CAP);
 
@@ -31,15 +39,60 @@ function rest_counter(\WP_REST_Request $req): \WP_REST_Response {
     if (!$campaign) {
         return new \WP_REST_Response(['used' => 0, 'max' => 0, 'remaining' => 0, 'active' => false]);
     }
+    $cache_key = 'hpm_counter_' . $campaign->id;
+    $cached    = wp_cache_get($cache_key, 'hpm');
+    if ($cached !== false) {
+        return new \WP_REST_Response($cached);
+    }
     $used = (int) $wpdb->get_var($wpdb->prepare(
         "SELECT COUNT(*) FROM {$wpdb->prefix}home_promo_counted WHERE campaign_id = %d",
         $campaign->id
     ));
-    return new \WP_REST_Response([
+    $data = [
         'used'      => $used,
         'max'       => $campaign->quota,
         'remaining' => max(0, $campaign->quota - $used),
         'active'    => true,
+    ];
+    wp_cache_set($cache_key, $data, 'hpm', 60);
+    return new \WP_REST_Response($data);
+}
+
+function rest_entry_status(\WP_REST_Request $req): \WP_REST_Response {
+    global $wpdb;
+    $entry_id = (int) $req['entry_id'];
+
+    $row = DB::get_entry_promo_status($entry_id);
+    if (!$row) {
+        return new \WP_REST_Response(['enrolled' => false, 'just_enrolled' => false]);
+    }
+
+    $campaign_name = '';
+    if (!empty($row['campaign_id'])) {
+        $campaigns_table = $wpdb->prefix . 'home_promo_campaigns';
+        $campaign_name   = (string) $wpdb->get_var($wpdb->prepare(
+            "SELECT name FROM {$campaigns_table} WHERE id = %d LIMIT 1",
+            (int) $row['campaign_id']
+        ));
+    }
+
+    $transient_key = 'hpm_just_enrolled_' . $entry_id;
+    $just_enrolled = (bool) get_transient($transient_key);
+    if ($just_enrolled) {
+        delete_transient($transient_key);
+    }
+
+    $raw_date = $row['enrolled_at'] ?? '';
+    $ts       = $raw_date ? strtotime($raw_date) : false;
+    $enrolled_at_fmt = ($ts && $ts > 0) ? wp_date('j M Y, g:i a', $ts) : '';
+
+    return new \WP_REST_Response([
+        'enrolled'      => true,
+        'just_enrolled' => $just_enrolled,
+        'code'          => $row['promo_code'] ?? '',
+        'category'      => $row['user_category'] ?? '',
+        'enrolled_at'   => $enrolled_at_fmt,
+        'campaign'      => $campaign_name,
     ]);
 }
 

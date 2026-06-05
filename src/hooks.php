@@ -213,8 +213,11 @@ class HookDispatcher
             'form_id'   => $form_id,
             'item_meta' => self::read_current_meta($entry_id),
         ];
-        $ctx = self::build_ctx('created', $entry_id, $post_values);
-        CampaignEngine::claim_slot($ctx);
+        $ctx    = self::build_ctx('created', $entry_id, $post_values);
+        $result = CampaignEngine::claim_slot($ctx);
+        if (($result['status'] ?? '') === 'claimed') {
+            set_transient('hpm_just_enrolled_' . $entry_id, 1, 120);
+        }
     }
 
     public static function on_after_update_entry(int $entry_id, int $form_id): void
@@ -257,8 +260,11 @@ class HookDispatcher
             }
         }
 
-        $ctx = self::build_ctx('updated', $entry_id, $values);
-        CampaignEngine::claim_slot($ctx);
+        $ctx    = self::build_ctx('updated', $entry_id, $values);
+        $result = CampaignEngine::claim_slot($ctx);
+        if (($result['status'] ?? '') === 'claimed') {
+            set_transient('hpm_just_enrolled_' . $entry_id, 1, 120);
+        }
     }
 
     public static function write_pasif_log_if_needed(int $entry_id, ?string $prev_label, ?string $new_label): void

@@ -216,7 +216,7 @@ class DB
      * @param int $entry_id Formidable entry ID
      * @param string $code Promo code used
      * @param string $branch Branch selection
-     * @param string $category User category (new/passive/diagnostic/lead)
+     * @param string $category User category (new/diagnosed/reactivation)
      * @param int|null $limit Per-code quota limit
      * @return bool True if inserted successfully
      */
@@ -887,6 +887,20 @@ class DB
             wp_cache_delete('home_promo_manager_settings', 'options');
             wp_cache_delete('alloptions', 'options');
         }
+    }
+
+    public static function get_entry_promo_status(int $entry_id): ?array
+    {
+        global $wpdb;
+        $table = self::table_name();
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT promo_code, user_category, created_at AS enrolled_at, campaign_id
+               FROM {$table}
+              WHERE entry_id = %d
+              LIMIT 1",
+            $entry_id
+        ), ARRAY_A);
+        return $row ?: null;
     }
 
     public static function schedule_cleanup(): void
